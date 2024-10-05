@@ -18,13 +18,6 @@ What are some trends in smart device usage?
 How could these trends apply to Bellabeat customers?
 How could these trends help influence Bellabeat marketing strategy?
 
-# Prepare
-To answer Bellabeat's business tasks I will be using FitBit Fitness Tracker Data (CC0: Public Domain, dataset made available through Mobius): This Kaggle data set contains personal fitness tracker from thirty fitbit users. Thirty eligible Fitbit users consented to the submission of personal tracker data, including minute-level output for physical activity, heart rate, and sleep monitoring. It includes information about daily activity, steps, and heart rate that can be used to explore users’ habits.
 
-## Considerations ##
-Sampling bias might apply, it is unclear how participants are choosen. As participants willing to make their activity data public they might be heavier users of FitBit.
-The dataset does not provide information about gender of the users. Bellabeat is a tech-driven wellness company for women only.
-The data is from 2023.
-I have used R programming language on RStudio for this project to help process and analyze. In order to solve this business task, only 6 of the given 10 datasets were used.
 
 
