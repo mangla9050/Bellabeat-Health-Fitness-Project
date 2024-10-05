@@ -1,0 +1,2826 @@
+---
+title: "Bellabeat Case Study with R"
+knit: (function(input_file, encoding) {
+  out_dir <- 'docs';
+  rmarkdown::render(input_file,
+ encoding=encoding,
+ output_file=file.path(dirname(input_file), out_dir, 'index.html'))})
+author: "joey petosa"
+date: "01-19-2022"
+output:
+  html_document:
+    theme: "spacelab"
+    css: style.css
+    code_folding: show
+    highlight: "textmate"
+    fig.width: 8
+    fig.height: 4
+    toc: true
+    toc_float:
+      collapsed: true
+      smooth_scroll: true
+    toc_depth: 5
+  pdf_document:
+    fig.width: 8
+    fig.height: 4
+    toc: true
+---
+
+
+```{r, setup, include=FALSE}
+# Set global options that apply to every code chunk
+knitr::opts_chunk$set(
+  comment='', indent='  ', message=FALSE
+)
+```
+
+
+
+# Ask  
+
+***
+
+### About  
+
+[Bellabeat](https://bellabeat.com/) is the go-to wellness brand for women with 
+an ecosystem of products and services that focuses on women’s health. They 
+empower women with knowledge about their own health and habits by collecting 
+data on activity, sleep, stress, and reproductive health. Urška Sršen, co-founder 
+and Chief Creative Officer of Bellabeat, believes that analyzing smart device 
+fitness data could help unlock new growth opportunities for the company.  
+
+
+### Key stakeholders  
+
+The key stakeholders for this project include:  
+
+* **Urška Sršen**: Bellabeat’s co-founder and Chief Creative Officer  
+* **Sando Mur**: Mathematician and Bellabeat’s co-founder; key member of the 
+Bellabeat executive team  
+* **Bellabeat marketing analytics team**: A team of data analysts responsible 
+for collecting, analyzing, and reporting data that helps guide Bellabeat’s 
+marketing strategy  
+
+
+
+### Guiding questions  
+
+These three questions will guide our analysis:  
+
+* What are some trends in smart device usage?  
+* How could these trends apply to Bellabeat customers?  
+* How could these trends help influence Bellabeat marketing strategy?  
+
+
+### Business task  
+
+>**Analyze smart device fitness data to gain insight into consumers and identify 
+trends that can inform Bellabeat App marketing strategy.**  
+
+
+
+# Prepare  
+
+***
+
+
+
+### Why R?  
+
+We are using R for our data analysis because it’s a powerful, all-in-one tool. 
+We can explore all the datasets quickly, provide code, share visualizations, 
+and keep everything organized all within this html file. This html file will 
+serve as a record of the data cleaning process, data analysis and data 
+visualization generation that preceded our stakeholder presentation.  
+
+
+
+### Install and load packages  
+
+The first thing we'll do is install the needed packages:  
+
+* **Install R packages**  
+    + `install.packages()`  
+    + Packages: tidyverse, ggplot2, here , hms, janitor, lubridate, skimr, \
+    gridExtra, paletteer, crayon, stringr, patchwork, ggthemes, ggforce, \
+    personograph, ggbeeswarm, knitr  
+
+```{r, install-packages, eval=FALSE, include=FALSE}
+# Install tidyverse package ---------------------------
+# Includes ggplot2, dplyr, tidyr, readr, purrr, tibble, stringr, forcats
+install.packages("tidyverse") 
+# Install additional packages ---------------------------
+install.packages(c(
+  "here", "hms", "janitor", "lubridate", "skimr", "gridExtra", "paletteer",
+  "crayon", "stringr", "personograph", "patchwork", "ggthemes", "ggforce",
+  "ggbeeswarm", "knitr",
+))
+```
+  
+Then we'll load the libraries for these packages:  
+
+* **Load R libraries**  
+    + `library()`  
+    + Packages: tidyverse, ggplot2, here , hms, janitor, lubridate, skimr, \
+    gridExtra, paletteer, crayon, stringr, patchwork, ggthemes, ggforce, \
+    personograph, ggbeeswarm, knitr   
+
+```{r, load-libraries, message=FALSE, include=FALSE}
+# Load tidyverse ---------------------------
+library("tidyverse")
+# Load additional packages ---------------------------
+library("here")
+library("hms")
+library("janitor")
+library("lubridate")
+library("skimr")
+library("gridExtra")
+library("paletteer")
+library("crayon")
+library("stringr")
+library("patchwork")
+library("ggthemes")
+library("ggforce")
+library("ggbeeswarm")
+library("personograph")
+library("knitr")
+```
+  
+
+
+### Data sources  
+
+We'll be using public data that explores smart device users' daily habits:  
+
+* [**FitBit Fitness Tracker Data**](https://www.kaggle.com/arashnic/fitbit) (CC0: 
+Public Domain, dataset made available through [Mobius](https://www.kaggle.com/arashnic)): 
+This Kaggle data set contains personal tracker data from thirty Fitbit users. 
+These Fitbit users consented to submission of personal tracker data, including 
+minute-level output for physical activity, heart rate, and sleep monitoring.  
+  
+**Important note:** The FitBit dataset does have some limitations. Since the 
+data is collected from thirty Fitbit users , it is not representative of the 
+entire fitness tracker industry and thus suffers some sampling bias. We will 
+address this limitation by using physical activity data from the World Health
+Organization (WHO) as a reference point for activity levels on a global scale. 
+We'll look at open data on global trends in physical activity levels. This data
+will be pulled from the WHO website and included in the final presentation. It 
+won't be used in this notebook, but we are including here for reference:  
+
+* [**GHO's data on prevalence of insufficient physical activity**](https://www.who.int/data/gho/data/indicators/indicator-details/GHO/prevalence-of-insufficient-physical-activity-among-adults-aged-18-years-(age-standardized-estimate)-(-)) 
+(CC BY-NC-SA 3.0 IGO: dataset made available through [GHO](https://www.who.int/data/gho/)): 
+This WHO data set contains data on the prevalence of insufficient physical 
+activity among adults aged 18+ years. The estimates are based on self-reported 
+physical activity captured using questionnaires covering activity at work/in 
+the household, for transport, and during leisure time. Since the WHO data is 
+self-reported, it suffers from all the biases of self-reported data (i.e. 
+response bias, social-desirability bias).
+
+
+### Importing data  
+
+Back to the FitBit data: we're going to explore data across fourteen CSV files. 
+The data is organized in rows and columns, making it structured data. 
+The majority of datasets are in long format, meaning each row is one time point 
+per session ID. Each session ID has data in multiple rows. Individual reports 
+can be parsed by export ID or time-stamp. These datasets fall into three 
+different groups based on the time increments they were tracked by:  
+
+1. Daily data  
+2. Hourly data  
+3. Minute data  
+
+
+By analyzing the daily, hourly, and minute level data provided, we can begin to 
+explore trends and search for insights that can be applied to Bellabeat 
+customers.  
+ 
+
+Let's look at the file sizes prior to importing. We don't want to overload our 
+RAM in Rstudio Cloud:  
+
+
+```{r, preview-file-size, echo=FALSE}
+# Daily data
+cat("dailyActivity_merged.csv", "=", sep = " ", file.info("fitbit_data/dailyActivity_merged.csv")$size, "bytes", fill = TRUE)
+cat("dailyCalories_merged.csv", "=", sep = " ", file.info("fitbit_data/dailyCalories_merged.csv")$size, "bytes", fill = TRUE)
+cat("dailyIntensities_merged.csv", "=", sep = " ", file.info("fitbit_data/dailyIntensities_merged.csv")$size, "bytes", fill = TRUE)
+cat("dailySteps_merged.csv", "=", sep = " ", file.info("fitbit_data/dailySteps_merged.csv")$size, "bytes", fill = TRUE)
+cat("sleepDay_merged.csv", "=", sep = " ", file.info("fitbit_data/sleepDay_merged.csv")$size, "bytes", fill = TRUE)
+cat("weightLogInfo_merged.csv", "=", sep = " ", file.info("fitbit_data/weightLogInfo_merged.csv")$size, "bytes", fill = TRUE)
+# Hourly data
+cat("hourlyCalories_merged.csv", "=", sep = " ", file.info("fitbit_data/hourlyCalories_merged.csv")$size, "bytes", fill = TRUE)
+cat("hourlyIntensities_merged.csv", "=", sep = " ", file.info("fitbit_data/hourlyIntensities_merged.csv")$size, "bytes", fill = TRUE)
+cat("hourlySteps_merged.csv", "=", sep = " ", file.info("fitbit_data/hourlySteps_merged.csv")$size, "bytes", fill = TRUE)
+# Minute data
+cat("minuteCaloriesNarrow_merged.csv", "=", sep = " ", file.info("fitbit_data/minuteCaloriesNarrow_merged.csv")$size, "bytes", fill = TRUE)
+cat("minuteIntensitiesNarrow_merged.csv", "=", sep = " ", file.info("fitbit_data/minuteIntensitiesNarrow_merged.csv")$size, "bytes", fill = TRUE)
+cat("minuteMETsNarrow_merged.csv", "=", sep = " ", file.info("fitbit_data/minuteMETsNarrow_merged.csv")$size, "bytes", fill = TRUE)
+cat("minuteSleep_merged.csv", "=", sep = " ", file.info("fitbit_data/minuteSleep_merged.csv")$size, "bytes", fill = TRUE)
+cat("minuteStepsNarrow_merged.csv", "=", sep = " ", file.info("fitbit_data/minuteStepsNarrow_merged.csv")$size, "bytes", fill = TRUE)
+```
+
+Based on file sizes, it looks like the minute level data could cause issues with 
+RAM usage in RStudio Cloud. Let's compare the size of the smallest minute level 
+dataset to the total combined size of all nine daily/hourly datasets:  
+
+
+
+* `minuteSleep_merged.csv` = **`8,848,370 bytes`**  
+
+
+* `dailyActivity_merged.csv`, \
+`dailyCalories_merged.csv`, \
+`dailyIntensities_merged.csv`, \
+`dailySteps_merged.csv`, \
+`sleepDay_merged.csv`, \
+`weightLogInfo_merged.csv`, \
+`hourlyCalories_merged.csv`, \
+`hourlyIntensities_merged.csv`, \
+`hourlySteps_merged.csv` =  **`2,753,820 bytes`**  (`r sum(111288+25125+70581+25175+18100+6725+801486+898778+796562)`)
+  
+
+
+>**Even if we combine the bytes for all the daily and hourly datasets, it still doesn't even come close in size to the smallest minute level dataset!**   
+
+
+
+Let's start with loading our daily and hourly datasets. We'll create dataframes 
+(df) for these now:  
+
+```{r, load-datasets-pt-1, message=FALSE, results="hide", eval=TRUE}
+daily_activity <- read_csv("fitbit_data/dailyActivity_merged.csv")
+daily_calories <- read_csv("fitbit_data/dailyCalories_merged.csv")
+daily_intensities <- read_csv("fitbit_data/dailyIntensities_merged.csv")
+daily_steps <- read_csv("fitbit_data/dailySteps_merged.csv")
+daily_sleep <- read_csv("fitbit_data/sleepDay_merged.csv")
+weight_log <- read_csv("fitbit_data/weightLogInfo_merged.csv")
+hourly_calories <- read_csv("fitbit_data/hourlyCalories_merged.csv")
+hourly_intensities <- read_csv("fitbit_data/hourlyIntensities_merged.csv")
+hourly_steps <- read_csv("fitbit_data/hourlySteps_merged.csv")
+```
+<br>
+
+Since the minute data is huge, we're only going to import the smallest dataset:  
+
+```{r, load-datasets-pt-2, message=FALSE, results="hide", eval=TRUE}
+minute_sleep <- read_csv("fitbit_data/minuteSleep_merged.csv")
+```
+
+
+
+# Process  
+
+***
+
+
+
+### Cleaning data  
+
+Now that we've identified and loaded the ten datasets we're going to use, we 
+need to ensure that the data within each  dataframe is clean and ready to 
+analyze.  
+
+
+
+#### Create tibbles  {.tabset .tabset-pills}
+
+Let's take a closer look at the different dataframes. We'll start by using the 
+`head()` function to view the first few rows of each one:  
+ 
+
+##### Daily dataframes  
+
+
+
+    `head(daily_activity)`  
+    ```{r, preview-daily-activity, echo=FALSE, eval=TRUE}
+    head(daily_activity)
+    ```
+    
+    `head(daily_calories)`  
+    ```{r, preview-daily-calories, echo=FALSE, eval=TRUE}
+    head(daily_calories)
+    ```
+    
+    `head(daily_intensities)`  
+    ```{r, preview-daily-intensities, echo=FALSE, eval=TRUE}
+    head(daily_intensities)
+    ```
+    
+    `head(daily_steps)`  
+    ```{r, preview-daily-steps, echo=FALSE, eval=TRUE}
+    head(daily_steps)
+    ```
+    
+    `head(daily_sleep)`  
+    ```{r, preview-sleep-day, echo=FALSE, eval=TRUE}
+    head(daily_sleep)
+    ```
+    
+    `head(weight_log)`  
+    ```{r, preview-weight-log, echo=FALSE, eval=TRUE}
+    head(weight_log)
+    ```
+
+
+
+##### Hourly dataframes  
+
+
+
+    `head(hourly_calories)`  
+    ```{r, preview-hourly-calories, echo=FALSE, eval=TRUE}
+    head(hourly_calories)
+    ```
+    
+    `head(hourly_intensities`  
+    ```{r, preview-hourly-intensities, echo=FALSE, eval=TRUE}
+    head(hourly_intensities)
+    ```
+    
+    `head(hourly_steps)`  
+    ```{r, preview-hourly-steps, echo=FALSE, eval=TRUE}
+    head(hourly_steps)
+    ```
+
+ 
+
+##### Minute dataframe  
+
+
+
+    `head(minute_sleep)`  
+    ```{r, preview-minute-sleep, echo=FALSE, eval=TRUE}
+    head(minute_sleep)
+    ```
+
+
+
+#### View column names  {.tabset .tabset-pills}  
+
+Now we'll use the `colnames()` function to view the column names for each 
+dataframe:  
+
+
+##### Daily dataframes  
+
+
+
+    `colnames(daily_activity)`
+    ```{r, daily-activity-colnames, echo=FALSE, eval=TRUE}
+      colnames(daily_activity)
+    ```
+    
+    `colnames(daily_calories)`  
+    ```{r, daily-calories-colnames, echo=FALSE, eval=TRUE}
+    colnames(daily_calories)
+    ```
+    
+    `colnames(daily_intensities)`
+    ```{r, daily-intensities-colnames, echo=FALSE, eval=TRUE}
+    colnames(daily_intensities)
+    ```
+    
+    `colnames(daily_steps)`
+    ```{r, daily-steps-colnames, echo=FALSE, eval=TRUE}
+    colnames(daily_steps)
+    ```
+    
+    `colnames(daily_sleep)`
+    ```{r, sleep-day-colnames, echo=FALSE, eval=TRUE}
+    colnames(daily_sleep)
+    ```
+    
+    `colnames(weight_log)`
+    ```{r, weight-log-colnames, echo=FALSE, eval=TRUE}
+    colnames(weight_log)
+    ```
+
+  
+
+##### Hourly dataframes    
+
+
+
+    `colnames(hourly_calories)`  
+    ```{r, hourly-calories-colnames, echo=FALSE, eval=TRUE}
+    colnames(hourly_calories)
+    ```
+    
+    `colnames(hourly_intensities)`   
+    ```{r, hourly-intensities-colnames, echo=FALSE, eval=TRUE}
+    colnames(hourly_intensities)
+    ```
+    
+    `colnames(hourly_steps)`  
+    ```{r, hourly-steps-colnames, echo=FALSE, eval=TRUE}
+    colnames(hourly_steps)
+    ```
+
+
+
+##### Minute dataframe  
+
+
+
+    `colnames(minute_sleep)`
+    ```{r, minute-sleep-colnames, echo=FALSE, eval=TRUE}
+    colnames(minute_sleep)
+    ```
+
+   
+
+#### View variables  {.tabset .tabset-pills}
+
+All these dataframes have the `Id` field, which can be used to merge them into 
+one another to create overall dataframes (i.e. daily df, hourly df). However, 
+the activity date/time variable formatting looks to be different across some of 
+the dataframes. Let's `select()` those variables to take a closer look.  
+
+  
+##### Daily dataframes  
+
+
+
+    ```{r, select-daily-datasets, eval=TRUE}
+daily_activity %>%
+  select(Id, ActivityDate)
+daily_calories %>%
+  select(Id, ActivityDay)
+daily_intensities %>%
+  select(Id, ActivityDay)
+daily_steps %>%
+  select(Id, ActivityDay)
+daily_sleep %>%
+  select(Id, SleepDay)
+weight_log %>%
+  select(Id, Date)
+    ```
+
+
+
+##### Hourly dataframes  
+
+
+
+    ```{r, select-hourly-datasets, eval=TRUE}
+hourly_calories %>%
+  select(Id, ActivityHour)
+hourly_intensities %>%
+  select(Id, ActivityHour)
+hourly_steps %>%
+  select(Id, ActivityHour)
+    ```
+
+
+##### Minute dataframe  
+
+
+
+    ```{r, select-minute-datasets, eval=TRUE}
+minute_sleep %>%
+  select(Id, date)
+    ```
+
+#### Data cleaning {.tabset .tabset-pills}
+
+Now that we've familiarized ourselves with the data, we can identify a few data
+cleaning tasks to move forward with. Here are the main areas we'll address:  
+
+1. **Naming conventions:** we'll adjust the variable names according to the 
+[tidyverse style guide](https://style.tidyverse.org/syntax.html). All variable 
+names will use only lowercase letters and underscores `_` (known as snake case) 
+to separate words within a name. This will make our code easier to read.  
+
+2. **Fix formatting issues:** we'll make the date-time format consistent across 
+each dataframe. This will prevent problems down the line during analysis, as 
+well as when we begin merging the data together.  
+
+3. **Create new variables:** we'll create a few new columns within each 
+dataframe.  
+
+4. **Create new dataframe:** in order to better analyze the `minute_sleep` data, 
+we'll first do some thorough transformation by reformatting and creating new 
+variables. Then we'll aggregate all the sleep data we have into a more 
+manageable structure.  
+<br>
+
+##### Daily dataframes  
+
+```{r, format-daily-data, message=FALSE, eval=TRUE}
+# daily_activity ---------------------------
+daily_activity <-
+  daily_activity %>% 
+  rename(
+    activity_date = ActivityDate, 
+    total_steps = TotalSteps, 
+    total_distance = TotalDistance,
+    tracker_distance = TrackerDistance,
+    logged_activities_d = LoggedActivitiesDistance,
+    very_active_d = VeryActiveDistance, 
+    moderately_active_d = ModeratelyActiveDistance, 
+    light_active_d = LightActiveDistance, 
+    sedentary_d = SedentaryActiveDistance, 
+    very_active_m = VeryActiveMinutes, 
+    fairly_active_m = FairlyActiveMinutes, 
+    lightly_active_m = LightlyActiveMinutes, 
+    sedentary_m = SedentaryMinutes, 
+    calories = Calories
+    ) %>% 
+  rename_with(
+    tolower, starts_with("Id")
+  ) %>% 
+  mutate(
+    # reformat variable as POSIXct to represent date and time
+    activity_date = parse_date_time(activity_date, "%m/%d/%y"),
+    # create new variable and format as date only
+    activity_date_ymd = as.Date(activity_date, "%Y/%m/%d"),
+    # create new variables for day of week and time of week
+    day_of_week = weekdays(as.Date(activity_date)),
+    time_of_week = case_when(
+      day_of_week %in% c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday") ~ "Weekday", 
+      day_of_week %in% c("Saturday", "Sunday") ~ "Weekend")
+    )
+# daily_calories ---------------------------
+daily_calories <-
+  daily_calories %>% 
+  rename(
+    activity_date = ActivityDay,
+    calories = Calories
+  ) %>% 
+   rename_with(
+    tolower, starts_with("Id")
+  ) %>% 
+  mutate(
+    activity_date = parse_date_time(activity_date, "%m/%d/%Y"),
+    activity_date_ymd = as.Date(activity_date, "%Y/%m/%d"),
+    day_of_week = weekdays(as.Date(activity_date)),
+    time_of_week = case_when(
+      day_of_week %in% c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday") ~ "Weekday", 
+      day_of_week %in% c("Saturday", "Sunday") ~ "Weekend")
+  )
+# daily_intensities ---------------------------
+daily_intensities <-
+  daily_intensities %>% 
+  rename(
+    activity_date = ActivityDay,
+    very_active_d = VeryActiveDistance, 
+    moderately_active_d = ModeratelyActiveDistance, 
+    light_active_d = LightActiveDistance, 
+    sedentary_d = SedentaryActiveDistance, 
+    very_active_m = VeryActiveMinutes, 
+    fairly_active_m = FairlyActiveMinutes, 
+    lightly_active_m = LightlyActiveMinutes, 
+    sedentary_m = SedentaryMinutes, 
+  ) %>% 
+   rename_with(
+    tolower, starts_with("Id")
+  ) %>% 
+  mutate(
+    activity_date = parse_date_time(activity_date, "%m/%d/%Y"),
+    activity_date_ymd = as.Date(activity_date, "%Y/%m/%d"),
+    day_of_week = weekdays(as.Date(activity_date)),
+    time_of_week = case_when(
+      day_of_week %in% c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday") ~ "Weekday", 
+      day_of_week %in% c("Saturday", "Sunday") ~ "Weekend")
+  )
+# daily_sleep ---------------------------
+daily_sleep <-
+  daily_sleep %>% 
+  rename(
+    activity_date = SleepDay,
+    total_sleep_records = TotalSleepRecords,
+    total_minutes_asleep = TotalMinutesAsleep,
+    total_time_in_bed = TotalTimeInBed
+  ) %>% 
+   rename_with(
+    tolower, starts_with("Id")
+  ) %>% 
+  mutate(
+    activity_date = parse_date_time(activity_date, "%m/%d/%Y %I:%M:%S %p"),
+    activity_date_ymd = as.Date(activity_date, "%Y/%m/%d"),
+    day_of_week = weekdays(as.Date(activity_date)),
+    time_of_week = case_when(
+      day_of_week %in% c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday") ~ "Weekday", 
+      day_of_week %in% c("Saturday", "Sunday") ~ "Weekend")
+    )
+# daily_steps ---------------------------
+daily_steps <-
+  daily_steps %>% 
+  rename(
+    activity_date = ActivityDay,
+    step_total = StepTotal
+  ) %>% 
+   rename_with(
+    tolower, starts_with("Id")
+  ) %>% 
+  mutate(
+    activity_date = parse_date_time(activity_date, "%m/%d/%Y"),
+    activity_date_ymd = as.Date(activity_date, "%Y/%m/%d"),
+    day_of_week = weekdays(as.Date(activity_date)),
+    time_of_week = case_when(
+      day_of_week %in% c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday") ~ "Weekday", 
+      day_of_week %in% c("Saturday", "Sunday") ~ "Weekend")
+  )
+# weight_log ---------------------------
+weight_log <-
+  weight_log %>% 
+  rename(
+    activity_date = Date,
+    weight_kg = WeightKg,
+    weight_lb = WeightPounds,
+    fat = Fat,
+    bmi = BMI,
+    manual_report = IsManualReport,
+    log_id = LogId
+  ) %>% 
+   rename_with(
+    tolower, starts_with("Id")
+  ) %>% 
+  mutate(
+    activity_date = parse_date_time(activity_date, "%m/%d/%Y %I:%M:%S %p"),
+    activity_date_ymd = as.Date(activity_date, "%Y/%m/%d"),
+    activity_time = format(activity_date, format = "%I:%M:%S %p"), 
+    day_of_week = weekdays(as.Date(activity_date)),
+    time_of_week = case_when(
+      day_of_week %in% c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday") ~ "Weekday", 
+      day_of_week %in% c("Saturday", "Sunday") ~ "Weekend"),
+    hour_of_day = as.POSIXct(activity_date, format = "%I:%M:%S %p")
+  )
+```
+
+
+
+##### Hourly dataframes  
+
+```{r, format-hourly-data, message=FALSE, eval=TRUE}
+# hourly_calories ---------------------------
+hourly_calories <-
+  hourly_calories %>% 
+  rename(
+    activity_hour = ActivityHour,
+    calories = Calories
+  ) %>% 
+   rename_with(
+    tolower, starts_with("Id")
+  ) %>% 
+  mutate(
+    activity_hour = parse_date_time(activity_hour, "%m/%d/%Y %I:%M:%S %p"),
+    activity_date_ymd = as.Date(activity_hour, "%Y/%m/%d"), 
+    activity_time = format(activity_hour, format = "%I:%M:%S %p"),
+    day_of_week = weekdays(as.Date(activity_hour)),
+    time_of_week = case_when(
+      day_of_week %in% c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday") ~ "Weekday", 
+      day_of_week %in% c("Saturday", "Sunday") ~ "Weekend"),
+    hour_of_day = as.POSIXct(activity_time, format = "%I:%M:%S %p")
+  )
+# hourly_intensities ---------------------------
+hourly_intensities <- 
+  hourly_intensities %>% 
+  rename(
+    activity_hour = ActivityHour,
+    total_intensity = TotalIntensity,
+    average_intensity = AverageIntensity
+  ) %>% 
+   rename_with(
+    tolower, starts_with("Id")
+  ) %>% 
+  mutate(
+    activity_hour = parse_date_time(activity_hour, "%m/%d/%Y %I:%M:%S %p"),
+    activity_date_ymd = as.Date(activity_hour, "%Y/%m/%d"), 
+    activity_time = format(activity_hour, format = "%I:%M:%S %p"),
+    day_of_week = weekdays(as.Date(activity_hour)),
+    time_of_week = case_when(
+      day_of_week %in% c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday") ~ "Weekday", 
+      day_of_week %in% c("Saturday", "Sunday") ~ "Weekend"),
+    hour_of_day = as.POSIXct(activity_time, format = "%I:%M:%S %p")
+  )
+# hourly_steps --------------------------- 
+hourly_steps <- 
+  hourly_steps %>% 
+  rename(
+    activity_hour = ActivityHour,
+    step_total = StepTotal
+  ) %>% 
+   rename_with(
+    tolower, starts_with("Id")
+  ) %>% 
+  mutate(
+    activity_hour = parse_date_time(activity_hour, "%m/%d/%Y %I:%M:%S %p"),
+    activity_date_ymd = as.Date(activity_hour, "%Y/%m/%d"), 
+    activity_time = format(activity_hour, format = "%I:%M:%S %p"),
+    day_of_week = weekdays(as.Date(activity_hour)),
+    time_of_week = case_when(
+      day_of_week %in% c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday") ~ "Weekday", 
+      day_of_week %in% c("Saturday", "Sunday") ~ "Weekend"),
+    hour_of_day = as.POSIXct(activity_time, format = "%I:%M:%S %p")
+  )
+```
+
+
+
+##### Minute dataframes  
+
+```{r, format-minute-data, message=FALSE, eval=TRUE}
+# minute_sleep ---------------------------
+minute_sleep <-
+  minute_sleep %>% 
+  rename(
+    activity_date = date,
+    sleep_value = value,
+    log_id = logId
+  ) %>% 
+   rename_with(
+    tolower, starts_with("Id")
+  ) %>% 
+  mutate(
+    activity_date = parse_date_time(activity_date, "%m/%d/%Y %I:%M:%S %p"),
+    activity_date_ymd = as.Date(activity_date, "%Y/%m/%d"),
+    activity_time = format(activity_date, format = "%I:%M:00 %p"), 
+    day_of_week = weekdays(as.Date(activity_date)),
+    time_of_week = case_when(
+      day_of_week %in% c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday") ~ "Weekday", 
+      day_of_week %in% c("Saturday", "Sunday") ~ "Weekend"),
+    hour_of_day = as.POSIXct(activity_time, format = "%I:%M:%S %p"),
+    # sleep_id will be used generate totals per sleep log
+    sleep_id = str_c(id, "-", log_id), 
+    # Create new variables for sleep values - asleep, restless, and awake
+    asleep = ifelse(sleep_value == 1, 1, 0),
+    restless = ifelse(sleep_value == 2, 1, 0),
+    awake = ifelse(sleep_value == 3, 1, 0)
+  )
+# Create sleep_summary_0 df ---------------------------
+# that shows totals for 3 sleep values per sleep log
+sleep_summary_0 <-
+  minute_sleep %>%
+  # id_date will be used to generate a daily total
+  mutate(
+    id_date = str_c(id, "-", activity_date_ymd)
+  ) %>% 
+  group_by(sleep_id, activity_date_ymd, id_date, id) %>% 
+  dplyr::summarize(
+    total_asleep = sum(sleep_value == "1"),
+    total_restless = sum(sleep_value == "2"),
+    total_awake = sum(sleep_value == "3")
+  )
+# Create sleep_summary df ---------------------------
+# that combines totals for each day per id
+sleep_summary <-
+  sleep_summary_0 %>%
+  # activity_date will be used to merge with daily_sleep df
+  mutate(
+    activity_date = parse_date_time(activity_date_ymd, "%Y/%m/%d")
+  ) %>%
+  group_by(id_date, activity_date, id) %>%
+  dplyr::summarize(
+    total_asleep_merged = sum(total_asleep),
+    total_restless_merged = sum(total_restless),
+    total_awake_merged = sum(total_awake)
+  )
+# Merge these two daily sleep dfs into one ---------------------------
+sleep_data <- merge(x = daily_sleep, y = sleep_summary, by = c("id", "activity_date"), all = TRUE)
+```
+
+
+
+
+# Analyze  
+
+***
+
+
+## Summary statistics 
+
+Now that we've done some deeper cleaning and formatting, let's get to know this 
+data from a big-picture perspective. We can do this by obtaining some high-level 
+summary statistics that can show us how these dataframes relate to one another, 
+as well as what trends might exist within each:  
+
+
+
+### A. Unique participants {.tabset .tabset-pills}  
+
+How many unique participants are there in each dataframe?  
+
+  
+#### Daily dataframes  
+
+```{r, distinct-daily-data, eval=TRUE}
+# There are 33 users (one user per unique id) in the daily activity df
+n_distinct(daily_activity$id)
+# There are 24 users (one user per unique id) in the sleep dfs
+n_distinct(daily_sleep$id)
+n_distinct(sleep_data$id)
+# There are 8 users (one user per unique id) in the weight df
+n_distinct(weight_log$id)
+```
+
+
+
+#### Hourly dataframes    
+
+```{r, distinct-hourly-data, eval=TRUE}
+# There are 33 users (one user per unique id) in the hourly dfs
+n_distinct(hourly_calories$id)
+n_distinct(hourly_intensities$id)
+n_distinct(hourly_steps$id)
+```
+
+
+
+#### Minute dataframe  
+
+```{r, distinct-minute-data, eval=TRUE}
+# There are 24 users (one user per unique id) in the minute df
+n_distinct(minute_sleep$id)
+```
+  
+
+
+### B. Total observations {.tabset .tabset-pills}  
+
+How many observations are there in each dataframe?  
+
+  
+#### Daily dataframes  
+
+```{r, observations-daily-data, eval=TRUE}
+# The observations vary across the daily dfs
+nrow(daily_activity)
+nrow(daily_sleep)
+nrow(sleep_data)
+nrow(weight_log)
+```
+
+
+
+#### Hourly dataframes  
+
+```{r, observations-hourly-data, eval=TRUE}
+# There are 22099 observations in each hourly dataframe
+nrow(hourly_calories)
+nrow(hourly_intensities)
+nrow(hourly_steps)
+```
+
+
+
+#### Minute dataframe  
+
+```{r, observations-minute-data, eval=TRUE}
+# There are 188521 observations in the minute dataframe
+nrow(minute_sleep)
+```
+   
+
+ 
+### C. Quick overview {.tabset .tabset-pills}  
+
+What are some quick summary statistics we'd want to know about each dataframe?  
+
+#### Daily dataframes  
+
+```{r, summary-stats-daily-data, message=FALSE, eval=TRUE}
+# Daily totals for steps, distance, calories ---------------------------
+daily_activity %>%
+  select(
+    total_steps,
+    total_distance,
+    calories
+  ) %>%
+  summary()
+# Active minute levels per category ---------------------------
+daily_activity %>%
+  select(
+    very_active_m,
+    fairly_active_m,
+    lightly_active_m,
+    sedentary_m
+  ) %>%
+  summary()
+# Sleep totals ---------------------------
+# for records, minutes asleep, and time in bed
+daily_sleep %>%
+  select(
+    total_sleep_records,
+    total_minutes_asleep,
+    total_time_in_bed
+  ) %>%
+  summary()
+# Sleep totals per category ---------------------------
+sleep_data %>%
+  select(
+    total_minutes_asleep, 
+    total_time_in_bed,
+    total_asleep_merged,
+    total_restless_merged,
+    total_awake_merged
+  ) %>%
+  summary()
+# Weight totals ---------------------------
+weight_log %>%
+  select(
+    weight_lb,
+    fat,
+    bmi
+  ) %>%
+  summary()
+```
+
+
+
+#### Hourly dataframes  
+
+```{r, summary-stats-hourly-data, message=FALSE, eval=TRUE}
+# Hourly calories summary ---------------------------
+hourly_calories %>%
+  select(calories) %>%
+  summary()
+# Hourly intensities summary ---------------------------
+hourly_intensities %>%
+  select(
+    total_intensity,
+    average_intensity
+  ) %>%
+  summary()
+# Hourly steps summary ---------------------------
+hourly_steps %>%
+  select(step_total) %>%
+  summary()
+```
+
+
+
+#### Minute dataframe  
+
+```{r, summary-stats-minute-data, message=FALSE, eval=TRUE}
+# Minute sleep summary ---------------------------
+minute_sleep %>%
+  select(
+    sleep_value,
+    asleep,
+    restless,
+    awake
+  ) %>%
+  summary()
+```
+  
+
+
+### D. Interesting notes  
+
+What does this tell us about this sample of people's activities? A few 
+interesting notes:  
+  
+* **7,638** - average total steps per day, which is below the generally 
+recommended 10,000 goal.  
+* **991.2** - average "Sedentary" minutes per day, which is the highest average 
+of the tracked activity minutes per day. This is just over 16.5 hours per day.  
+* **192.8**- average "Lightly Active" minutes per day, which the highest among 
+the non-sedentary activity minutes per day (*21.16* - Very Active, *13.56*- 
+Fairly Active).  
+* **34.72** - combined daily average of Very Active (21.16) and Fairly Active 
+(13.56) minutes per day. This indicates that, on average, these individuals may 
+mostly be getting the WHO recommended 150 minutes of moderate-intensity physical 
+activity per week [Global recommendations on physical activity for health](https://www.who.int/publications/i/item/9789241599979)  
+* **91.5%** - average percentage of time asleep while in bed. This is calculated 
+by dividing "Total Minutes Asleep" (419.5) by "Total Time In Bed" (458.6).  
+* **97.39** - average calories burned per hour.  
+  
+
+  
+## Plotting a few explorations  
+
+
+
+### Steps and active minutes  
+
+The goal of 10,000 steps per day has been widely proposed across the smart 
+device industry. But how important of a health metric is daily steps really? 
+For example, what's the relationship between total steps and calories burned?  
+
+```{r, total-steps-vs-calories, message=FALSE, eval=TRUE}
+# Total steps vs calories plot ---------------------------
+ggplot(data = daily_activity, aes(x = total_steps, y = calories)) +
+  geom_point() +
+  geom_smooth() + # Trend line with a shadow representing  95% confidence interval
+  labs(title = "Total steps vs calories") +
+  ylab("Calories") +
+  xlab("Total Steps") +
+  theme_minimal()
+cor.test(daily_activity$total_steps, daily_activity$calories, method = "pearson")
+```
+
+As expected, we see a positive correlation here between `total_steps` and 
+`calories`. This makes sense because the more active someone is, the more 
+calories they will burn. But what about the relationship between 
+`very_active_m` and `calories`?  
+
+```{r, very-active-minutes-vs-calories, eval=TRUE}
+# Very active minutes vs calories plot ---------------------------
+ggplot(data = daily_activity, aes(x = very_active_m, y = calories)) +
+  geom_point() +
+  geom_smooth() + # Trend line with a shadow representing  95% confidence interval
+  labs(title = "Very active minutes vs calories") +
+  ylab("Calories") +
+  xlab("Very active minutes") +
+  theme_minimal()
+cor.test(daily_activity$very_active_m, daily_activity$calories, method = "pearson")
+```
+
+Unsurprisingly, we see another positive correlation. This time between 
+`very_active_m` and `calories`. Very active people will burn more 
+calories. But we know from earlier that the average `very_active_m` per day 
+of `21.16` is much lower than then average `lightly_active_m` per day of 
+`192.80`. So what's the relationship between `lightly_active_m` and 
+`calories`?  
+
+```{r, lightly-active-minutes-vs-calories, eval=TRUE}
+# Lightly active minutes vs calories plot ---------------------------
+ggplot(data = daily_activity, aes(x = lightly_active_m, y = calories)) +
+  geom_point() +
+  geom_smooth() + # Trend line with a shadow representing  95% confidence interval
+  labs(title = "Lightly active minutes vs calories") +
+  ylab("Calories") +
+  xlab("Lightly active minutes") +
+  theme_minimal()
+cor.test(daily_activity$lightly_active_m, daily_activity$calories, method = "pearson")
+```
+
+The relationship between `lightly_active_m` and `calories` is still 
+positive, albeit a lot weaker. This could mean that `lightly_active_m` has 
+less of an impact on calories burned throughout a day.  
+
+
+
+### Daily calories  
+
+What's the relationship between calories and day of the week?   
+
+```{r, daily-calories-vs-day-of-week, eval=TRUE}
+# Create labels and limits for plot ---------------------------
+labels_weekdays <- c(
+  "Monday" = "Monday", "Tuesday" = "Tuesday",
+  "Wednesday" = "Wednesday", "Thursday" = "Thursday",
+  "Friday" = "Friday", "Saturday" = "Saturday",
+  "Sunday" = "Sunday"
+  )
+limits_weekdays <- c(
+  "Monday", "Tuesday", "Wednesday", "Thursday", "Friday",
+  "Saturday", "Sunday"
+  )
+# Calories vs day of week plot ---------------------------
+ggplot(data = daily_activity) +
+  geom_point(
+    aes(x = day_of_week, y = calories, color = as.factor(time_of_week)),
+    position = "jitter", 
+    alpha = 0.3
+    ) +
+  labs(title = "Daily calories throughout the week", color = "Time of week") +
+  ylab("Total Calories") +
+  scale_x_discrete(
+    "Day",
+    labels = labels_weekdays, 
+    limits = limits_weekdays,
+    guide = guide_axis(angle = 45)
+    ) +
+  stat_summary(
+    aes(x = day_of_week, y = calories),
+    fun = mean, 
+    geom = "point",
+    color = "red", 
+    size = 2, 
+    alpha = 0.7
+    ) +
+  theme_minimal()
+```
+
+There doesn't look to be a large difference in the average calories burned per 
+day. These averages are represented by the red dots on each day.  
+
+### Daily sleep  
+
+What's the relationship between sleep quality and time of week? You might expect 
+people to get better sleep over the weekends vs weekdays - are there any 
+unexpected trends?  
+
+```{r, sleep-values-vs-time-of-week, eval=TRUE}
+# Total minutes asleep vs time of week ---------------------------
+ggplot(data = sleep_data) +
+  geom_point(
+    aes(
+    x = weekdays.POSIXt(activity_date), 
+    y = total_asleep_merged,
+    color = as.factor(time_of_week)
+    ),
+  position = "jitter",
+  alpha = 0.3
+  ) +
+  labs(title = "Total minutes asleep throughout week") +
+  guides(color = "none") +
+  ylab("Minutes asleep") +
+  scale_x_discrete(
+    "Day",
+    labels = labels_weekdays, 
+    limits = limits_weekdays,
+    guide = guide_axis(angle = 45)
+    ) +
+  stat_summary(
+    aes(x = weekdays.POSIXt(activity_date), y = total_asleep_merged),
+    fun = mean, 
+    geom = "point", 
+    color = "red", 
+    size = 2,
+    alpha = 0.7
+    ) +
+  theme_minimal()
+# Total minutes restless vs time of week ---------------------------
+ggplot(data = sleep_data) +
+  geom_point(
+    aes(
+    x = weekdays.POSIXt(activity_date), 
+    y = total_restless_merged,
+    color = as.factor(time_of_week)
+    ),
+  position = "jitter",
+  alpha = 0.3
+  ) +
+  labs(title = "Total minutes restless throughout week") +
+  guides(color = "none") +
+  ylab("Minutes restless") +
+  scale_x_discrete(
+    "Day",
+    labels = labels_weekdays, 
+    limits = limits_weekdays,
+    guide = guide_axis(angle = 45)
+    ) +
+  stat_summary(
+    aes(x = weekdays.POSIXt(activity_date), y = total_restless_merged),
+    fun = mean, 
+    geom = "point", 
+    color = "red", 
+    size = 2,
+    alpha = 0.7
+    ) +
+  theme_minimal()
+# Total minutes awake vs time of week ---------------------------
+ggplot(data = sleep_data) +
+  geom_point(
+    aes(
+      x = weekdays.POSIXt(activity_date), 
+      y = total_awake_merged,
+      color = as.factor(time_of_week)
+      ),
+    position = "jitter",
+    alpha = 0.3
+    ) +
+  labs(title = "Total minutes awake throughout week") +
+  guides(color = "none") +
+  ylab("Minutes awake") +
+  scale_x_discrete(
+    "Day",
+    labels = labels_weekdays, 
+    limits = limits_weekdays,
+    guide = guide_axis(angle = 45)
+    ) +
+  stat_summary(
+    aes(x = weekdays.POSIXt(activity_date), y = total_awake_merged),
+    fun = mean, 
+    geom = "point", 
+    color = "red", 
+    size = 2,
+    alpha = 0.7
+    ) +
+  theme_minimal()
+```
+
+Based on the averages for each day on these graphs (red dots), we can see that:
+
+* The average total minutes sleep were highest on Sunday, Wednesday and 
+Saturday 
+* The average for minutes awake and minutes restless were highest on Sunday 
+and Saturday
+
+People do seem to get sleep more on the weekends. However, it doesn't look like 
+the quality of sleep is greater based minutes awake and restless.  
+
+
+  
+## Merging data    
+
+Based on these initial explorations, the impact of active minutes seems like it 
+could reveal deeper customer insights than total steps, calories or sleep. It 
+would benefit us to merge these dataframes and explore that metric further.  
+
+### daily_data  
+Let's start with combining `daily_activity`, `sleep_data`, and `weight_log`
+into one `daily_data` dataframe. We will disregard the `daily_calories`, 
+`daily_intensities`, and `daily_steps` since their data is already aggregated 
+within the the `daily_activity` dataframe:  
+
+```{r, merge-daily-data-into-one-df, eval=TRUE}
+# Merging daily data into one df ---------------------------
+daily_data_0 <-
+  merge(
+    x = daily_activity, y = sleep_data,
+    by = c("id", "activity_date_ymd", "day_of_week", "time_of_week"), 
+    all.x = TRUE
+  )
+daily_data <-
+  merge(
+    x = daily_data_0, y = weight_log,
+    by = c("id", "activity_date_ymd", "day_of_week", "time_of_week"), all.x = TRUE
+  )
+# Add two new active minute variables to daily data ---------------------------
+daily_data <-
+  daily_data %>%
+  mutate(
+    daily_mod_vig_m = fairly_active_m + very_active_m, 
+    daily_light_sed_m = lightly_active_m + sedentary_m
+  )
+```
+
+### hourly_data   
+
+Now we'll combine `hourly_calories`, `hourly_intensities`, and `hourly_steps`
+into one `hourly_data` dataframe:  
+
+```{r, merge-hourly-data-into-one-df, eval=TRUE}
+# Merging hourly data into one df  ---------------------------
+hourly_data_0 <-
+  merge(
+    x = hourly_calories, y = hourly_intensities,
+    by = c(
+      "id", "activity_hour", "activity_date_ymd", "activity_time", "hour_of_day", 
+      "day_of_week", "time_of_week"
+    ),
+    all.x = TRUE, no.dups = TRUE
+  )
+hourly_data <-
+  merge(
+    x = hourly_data_0, y = hourly_steps,
+    by = c(
+      "id", "activity_hour", "activity_date_ymd", "activity_time", "hour_of_day", 
+      "day_of_week", "time_of_week"
+    ),
+    all.x = TRUE
+  )
+```
+
+### weekly_data   
+
+Finally, we'll create a `weekly_data` dataframe using data from daily data:  
+
+```{r, create-weekly-total-df, eval=TRUE}
+# Create new weekly_data_00 df  ---------------------------
+weekly_data_0 <-
+  daily_data %>%
+  select(
+    id, activity_date_ymd, day_of_week, activity_date, total_steps, total_distance,
+    very_active_d, moderately_active_d, light_active_d,
+    sedentary_d, very_active_m, fairly_active_m,
+    lightly_active_m, sedentary_m, calories
+  ) %>%
+  mutate(
+    week_number = paste0(
+      "Week ", (as.numeric(format(activity_date_ymd, "%U"))), ", ", 
+      format(activity_date_ymd, "%b %Y")
+      )
+  )
+# Summarize totals by week in new weekly_data df  ---------------------------
+weekly_data <-
+  weekly_data_0 %>%
+  group_by(id, week_number) %>%
+  dplyr::summarize(
+    weekly_total_steps = sum(total_steps),
+    weekly_total_distance = sum(total_distance),
+    weekly_vigorous_d = sum(very_active_d),
+    weekly_moderate_d = sum(moderately_active_d),
+    weekly_light_d = sum(light_active_d),
+    weekly_sedentary_d = sum(sedentary_d),
+    weekly_vigorous_m = sum(very_active_m),
+    weekly_moderate_m = sum(fairly_active_m),
+    weekly_mod_vig_m = weekly_vigorous_m + weekly_moderate_m,
+    weekly_light_m = sum(lightly_active_m),
+    weekly_sedentary_m = sum(sedentary_m),
+    weekly_light_sed_m = weekly_light_m + weekly_sedentary_m,
+    weekly_calories = sum(calories)
+  )
+```
+
+
+
+
+## Data cleaning [revisited] {.tabset .tabset-pills}  
+Before continuing with our analysis on these merged dataframes, let's do some
+more data cleaning.  
+
+### Delete old dataframes  
+
+Let's free up some RAM space by deleting old dataframes that we'll no longer 
+need or aren't using moving forward with our analysis:  
+
+```{r, remove-old-dfs, eval=TRUE}
+# List all objects in current R workspace ---------------------------
+ls()
+# Remove old objects ---------------------------
+# we'll no longer need or use moving forward
+rm("daily_calories", "daily_intensities", "daily_steps", "daily_sleep", 
+   "weight_log")
+rm("hourly_calories", "hourly_intensities", "hourly_steps", "minute_sleep")
+rm("daily_data_0", "hourly_data_0", "sleep_summary_0", "weekly_data_0")
+# List all objects again in current R workspace  ---------------------------
+ls()
+```
+
+### Create new variables for faceting  
+
+In order to create plots that are faceted by day of week or time of day in 
+correct order, we'll need to add a new variable to each of the merged dataframes:  
+
+```{r, add-new-variable-for-ordered-faceting, eval=TRUE}
+# Create day_list for ordered facet grid/wrapping  ---------------------------
+hourly_data$day_list <-
+  factor(hourly_data$day_of_week, levels = c(
+    "Monday", "Tuesday", "Wednesday", "Thursday",
+    "Friday", "Saturday", "Sunday"
+  ))
+daily_data$day_list <-
+  factor(daily_data$day_of_week, levels = c(
+    "Monday", "Tuesday", "Wednesday", "Thursday",
+    "Friday", "Saturday", "Sunday"
+  ))
+# Create time_list for ordered facet grid/wrapping ---------------------------
+hourly_data$time_list <-
+  factor(hourly_data$activity_time,
+    levels = c(
+      "12:00:00 AM", "01:00:00 AM", "02:00:00 AM", "03:00:00 AM",
+      "04:00:00 AM", "05:00:00 AM", "06:00:00 AM", "07:00:00 AM",
+      "08:00:00 AM", "09:00:00 AM", "10:00:00 AM", "11:00:00 AM",
+      "12:00:00 PM", "01:00:00 PM", "02:00:00 PM", "03:00:00 PM",
+      "04:00:00 PM", "05:00:00 PM", "06:00:00 PM", "07:00:00 PM",
+      "08:00:00 PM", "09:00:00 PM", "10:00:00 PM", "11:00:00 PM"
+    )
+  )
+```
+
+### Mean or median? {.tabset .tabset-fade}  
+
+Before we launch into the new summary stats, we need to answer an important 
+question:  
+
+* Should we use mean or median when presenting these summary statistics?  
+
+Well, the answer to this question depends on how strongly the outliers are 
+influencing the mean. We can visualize with histograms of each new dataframe:  
+
+
+#### daily_data  
+
+```{r, daily-histogram-plots, eval=TRUE}
+# Daily histogram plot ---------------------------
+daily_hplot <- ggplot(data = daily_data)
+# Histogram plot for daily_mod_vig_m ---------------------------
+(bw <- nclass.FD(daily_data$daily_mod_vig_m)) # Optimize binwidth for each plot
+daily_hplot +
+  geom_histogram(aes(x = daily_mod_vig_m), bins = bw) +
+  labs(
+    x = "Minutes",
+    y = "Count",
+    title = "Daily moderate/vigorous minutes",
+    caption = "Median: 21.00  ,  Mean: 34.87"
+  ) 
+# Histogram plot for daily_light_sed_m ---------------------------
+(bw <- nclass.FD(daily_data$daily_light_sed_m))
+daily_hplot +
+  geom_histogram(aes(x = daily_light_sed_m), bins = bw) +
+  labs(
+    x = "Minutes",
+    y = "Count",
+    title = "Daily light/sedentary minutes",
+    caption = "Median: 1333  ,  Mean: 1183"
+  )
+# Histogram plot for total_steps ---------------------------
+(bw <- nclass.FD(daily_data$total_steps))
+daily_hplot +
+  geom_histogram(aes(x = total_steps), bins = bw) +
+  labs(
+    x = "Total Steps",
+    y = "Count",
+    title = "Daily total steps",
+    caption = "Median: 7439  ,  Mean: 7652"
+  )
+# Histogram plot for calories ---------------------------
+(bw <- nclass.FD(daily_data$calories))
+daily_hplot +
+  geom_histogram(aes(x = calories), bins = bw) +
+  labs(
+    x = "Calories",
+    y = "Count",
+    title = "Daily total calories",
+    caption = "Median: 2140  ,  Mean: 2308"
+  )
+# Histogram plot for total_minutes_asleep ---------------------------
+daily_hplot +
+  geom_histogram(aes(x = total_minutes_asleep)) +
+  labs(
+    x = "Total Minutes Asleep",
+    y = "Count",
+    title = "Daily minutes asleep",
+    caption = "Median: 433.0  ,  Mean: 419.5"
+  )
+# Histogram plot for total_time_in_bed ---------------------------
+daily_hplot +
+  geom_histogram(aes(x = total_time_in_bed)) +
+  labs(
+    x = "Total Time in Bed",
+    y = "Count",
+    title = "Daily total time in bed",
+    caption = "Median: 463.0  ,  Mean: 458.6"
+  )
+# Remove bindwith object ---------------------------
+rm(bw)
+```
+
+Since a few outliers are greatly affecting the mean for each variable, we should 
+use median for all these daily summary statistics: daily moderate/vigorous 
+minutes, daily light/sedentary minutes, and daily total steps. However, we can 
+still use mean for the sleep variables and calories.
+
+#### hourly_data  
+
+```{r, hourly-histogram-plots, eval=TRUE}
+# Hourly histogram plots ---------------------------
+hourly_hplot <- ggplot(data = hourly_data)
+# Histogram plot for calories ---------------------------
+(bw <- nclass.FD(hourly_data$calories)) # Optimize binwidth for each plot
+hourly_hplot +
+  geom_histogram(aes(x = calories), bins = bw) +
+  labs(
+    title = "Hourly calories",
+    caption = "Median: 83.00  ,  Mean: 97.39",
+    x = "Calories",
+    y = "Count"
+  )
+# Histogram plot for total_intensity ---------------------------
+(bw <- nclass.FD(hourly_data$total_intensity))
+hourly_hplot +
+  geom_histogram(aes(x = total_intensity), bins = bw) +
+  labs(
+    title = "Hourly total intensity",
+    caption = "Median: 3.00,  Mean: 12.04",
+    x = "Total Intensity",
+    y = "Count"
+  )
+# Histogram plot for average_intensity ---------------------------
+(bw <- nclass.FD(hourly_data$average_intensity))
+hourly_hplot +
+  geom_histogram(aes(x = average_intensity), bins = bw) +
+  labs(
+    title = "Hourly average intensity",
+    caption = "Median: 0.0500,  Mean: 0.2006",
+    x = "Average Intensity",
+    y = "Count"
+  )
+# Histogram plot for step_total ---------------------------
+(bw <- nclass.FD(hourly_data$step_total))
+hourly_hplot +
+  geom_histogram(aes(x = step_total), bins = bw) +
+  labs(
+    x = "Step Total",
+    y = "Count",
+    title = "Hourly step total",
+    caption = "Median: 40.0  ,  Mean: 320.2"
+  ) 
+# Remove bindwith object ---------------------------
+rm(bw)
+```
+
+It looks like we should use the median for all the hourly summary statistics as
+well: hourly calories, hourly total intensity, hourly average intensity and 
+hourly step total. 
+
+#### weekly_data  
+
+```{r, weekly-histogram-plots, eval=TRUE}
+# Weekly histogram plots ---------------------------
+weekly_hplot <- ggplot(data = weekly_data)
+# Histogram plot for weekly_vigorous_m ---------------------------
+(bw <- nclass.FD(weekly_data$weekly_vigorous_m)) # Optimize binwidth for each plot
+weekly_hplot +
+  geom_histogram(aes(x = weekly_vigorous_m), bins = bw) +
+  labs(
+    x = "Minutes",
+    y = "Count",
+    title = "Weekly vigorous minutes",
+    caption = "Median: 68.50  ,  Mean: 130.10"
+  )
+# Histogram plot for weekly_moderate_m ---------------------------
+(bw <- nclass.FD(weekly_data$weekly_moderate_m))
+weekly_hplot +
+  geom_histogram(aes(x = weekly_moderate_m), bins = bw) +
+  labs(
+    x = "Minutes",
+    y = "Count",
+    title = "Weekly moderate minutes",
+    caption = "Median: 65.50  ,  Mean: 83.45"
+  )
+# Histogram plot for weekly_light_m ---------------------------
+(bw <- nclass.FD(weekly_data$weekly_light_m))
+weekly_hplot +
+  geom_histogram(aes(x = weekly_light_m), bins = bw) +
+  labs(
+    x = "Minutes",
+    y = "Count",
+    title = "Weekly light minutes",
+    caption = "Median: 1188  ,  Mean: 1182"
+  )
+# Histogram plot for weekly_sedentary_m ---------------------------
+(bw <- nclass.FD(weekly_data$weekly_sedentary_m))
+weekly_hplot +
+  geom_histogram(aes(x = weekly_sedentary_m), bins = bw) +
+  labs(
+    x = "Minutes",
+    y = "Count",
+    title = "Weekly sedentary minutes",
+    caption = "Median: 5754  ,  Mean: 6064"
+  )
+# Histogram plot for weekly_mod_vig_m ---------------------------
+(bw <- nclass.FD(weekly_data$weekly_mod_vig_m))
+weekly_hplot +
+  geom_histogram(aes(x = weekly_mod_vig_m), bins = bw) +
+  labs(
+    x = "Minutes",
+    y = "Count",
+    title = "Weekly moderate/vigorous minutes",
+    caption = "Median: 182.00  ,  Mean: 213.51"
+  )
+# Histogram plot for weekly_light_sed_m ---------------------------
+(bw <- nclass.FD(weekly_data$weekly_light_sed_m))
+weekly_hplot +
+  geom_histogram(aes(x = weekly_light_sed_m), bins = bw) +
+  labs(
+    x = "Minutes",
+    y = "Count",
+    title = "Weekly light/sedentary minutes",
+    caption = "Median: 6956  ,  Mean: 7246"
+  )
+# Histogram plot for weekly_total_steps ---------------------------
+(bw <- nclass.FD(weekly_data$weekly_total_steps))
+weekly_hplot +
+  geom_histogram(aes(x = weekly_total_steps), bins = bw) +
+  labs(
+    x = "Total Steps",
+    y = "Count",
+    title = "Weekly total steps",
+    caption = "Median: 44903  ,  Mean: 46857"
+  )
+# Histogram plot for weekly_calories ---------------------------
+(bw <- nclass.FD(weekly_data$weekly_calories))
+weekly_hplot +
+  geom_histogram(aes(x = weekly_calories), bins = bw) +
+  labs(
+    x = "Calories",
+    y = "Count",
+    title = "Weekly calories",
+    caption = "Median: 13615  ,  Mean: 14130"
+  )
+# Remove bindwith object ---------------------------
+rm(bw)
+```  
+
+It looks like we should use median for three of the weekly summary statistics: 
+weekly vigorous minutes, weekly moderate minutes, and weekly moderate/vigorous 
+minutes. We should use mean for the remaining five: weekly sedentary minutes, 
+weekly light minutes, weekly light/sedentary minutes, weekly total steps and 
+weekly calories.  
+
+## Summary stats [revisited]
+
+
+### New summary stats  {.tabset .tabset-pills}
+
+Let's look at the quick summary statistics we'd want to know about each new 
+dataframe:  
+
+#### **daily_data**  
+
+```{r, summary-stats-for-new-daily-df, message=FALSE, eval=TRUE}
+# Daily steps, distance and calories ---------------------------
+daily_data %>%
+  select(
+    total_steps,
+    total_distance,
+    calories
+  ) %>%
+  summary()
+# Active minute levels per category ---------------------------
+daily_data %>%
+  select(
+    very_active_m,
+    fairly_active_m,
+    lightly_active_m,
+    sedentary_m,
+    daily_mod_vig_m,
+    daily_light_sed_m
+  ) %>%
+  summary()
+# Daily overall sleep ---------------------------
+daily_data %>%
+  select(
+    total_sleep_records,
+    total_minutes_asleep,
+    total_time_in_bed
+  ) %>%
+  summary()
+# Daily sleep by category ---------------------------
+daily_data %>%
+  select(
+    total_asleep_merged,
+    total_restless_merged,
+    total_awake_merged
+  ) %>%
+  summary()
+# Weight logs ---------------------------
+daily_data %>%
+  select(
+    weight_lb,
+    fat,
+    bmi
+  ) %>%
+  summary()
+```
+
+#### **hourly_data**  
+
+```{r, summary-stats-for-new-hourly-df, message=FALSE, eval=TRUE}
+# Hourly calories, intensities, step totals ---------------------------
+hourly_data %>%
+  select(
+    calories,
+    total_intensity,
+    average_intensity,
+    step_total
+  ) %>%
+  summary()
+```
+  
+#### **weekly_data**  
+
+```{r, summary-stats-for-new-weekly-df, message=FALSE, eval=TRUE}
+# Weekly data for original active minute totals ---------------------------
+# vigorous, moderate, light and sedentary
+weekly_data %>%
+  ungroup() %>%
+  select(
+    weekly_vigorous_m,
+    weekly_moderate_m,
+    weekly_light_m,
+    weekly_sedentary_m
+  ) %>%
+  summary()
+# Weekly data for new combo active minute totals ---------------------------
+# moderate/vigorous and light/sedentary
+weekly_data %>%
+  ungroup() %>%
+  select(
+    weekly_mod_vig_m,
+    weekly_light_sed_m
+  ) %>%
+  summary()
+# Weekly data for total steps and calories ---------------------------
+weekly_data %>%
+  ungroup() %>%
+  select(
+    weekly_total_steps,
+    weekly_calories
+  ) %>%
+  summary()
+```
+
+
+
+### New interesting notes  
+
+What does this tell us about this sample of people's weekly activities? A few 
+interesting notes:  
+
+* **46,857 steps** - average total steps per week, which falls below the 
+recommended weekly goal of 70,000 (10,000 goal per day x 7 days).
+* **6,064 min.** - weekly average of sedentary minutes, which is the highest 
+average of the tracked activity minutes. This is just over 4.2 days per week!
+* **1,182 min. **- weekly average of light-intensity (LightlyActive) minutes, 
+which the highest among the non-sedentary activity minutes per week.
+* **182.00 min.** - weekly median of combined moderate- and vigorous-intensity 
+activity minutes. 
+* **65.50 min.**  - weekly median of moderate-intensity (FairlyActive) activity
+minutes. 
+* **68.5 min.** - weekly median of vigorous-intensity (VeryActive) activity 
+minutes. It's surprising that this number is higher than the moderate-intensity 
+average!
+* **91.5%** - average percentage of time asleep while in bed. This is calculated 
+by dividing "Total Minutes Asleep" (419.5) by "Total Time In Bed" (458.6).
+* **83.00** - median calories burned per hour.  
+
+## New exploration  
+
+### Hour of day  
+
+Let's look at some possible relationships between hour of day and different 
+variables. We'll create `labels_hour_of_day` to use for these plots:  
+
+```{r, labels-for-hour-of-day-plots, fig.width=10, fig.asp=NULL, eval=TRUE}
+# Create labels for hour of day ---------------------------
+# Note that we are assigning times to the current date of  analysis to ensure
+# that all times are within the same 24 hour day
+labels_hour_of_day <- c(
+  "2022-01-18 00:00:00" = "00:00",
+  "2022-01-18 01:00:00" = "01:00",
+  "2022-01-18 02:00:00" = "02:00",
+  "2022-01-18 03:00:00" = "03:00",
+  "2022-01-18 04:00:00" = "04:00",
+  "2022-01-18 05:00:00" = "05:00",
+  "2022-01-18 06:00:00" = "06:00",
+  "2022-01-18 07:00:00" = "07:00",
+  "2022-01-18 08:00:00" = "08:00",
+  "2022-01-18 09:00:00" = "09:00",
+  "2022-01-18 10:00:00" = "10:00",
+  "2022-01-18 11:00:00" = "11:00",
+  "2022-01-18 12:00:00" = "12:00",
+  "2022-01-18 13:00:00" = "13:00",
+  "2022-01-18 14:00:00" = "14:00",
+  "2022-01-18 15:00:00" = "15:00",
+  "2022-01-18 16:00:00" = "16:00",
+  "2022-01-18 17:00:00" = "17:00",
+  "2022-01-18 18:00:00" = "18:00",
+  "2022-01-18 19:00:00" = "19:00",
+  "2022-01-18 20:00:00" = "20:00",
+  "2022-01-18 21:00:00" = "21:00",
+  "2022-01-18 22:00:00" = "22:00",
+  "2022-01-18 23:00:00" = "23:00",
+  "2022-01-18 24:00:00" = "24:00"
+)
+```
+
+What hours of the day have the highest observations per data point? Are there 
+certain times where people are most active?  
+
+```{r, hour-of-day-vs-count-of-observations, fig.height=5, fig.width=10, fig.asp=NULL, eval=TRUE}
+# step_total observations per hour ---------------------------
+ggplot(data = hourly_data, aes(x = as.factor(hour_of_day))) +
+  geom_bar(aes(weight = step_total), stat = "count") +
+  labs(title = "'step_total' observations throughout a 24 hour day") +
+  scale_y_continuous(name = "Count", labels = scales::comma) +
+  scale_x_discrete(
+    "Hour of day", 
+    labels = labels_hour_of_day,
+    guide = guide_axis(angle = 45)
+    ) +
+  theme_minimal()
+# calories observations per hour ---------------------------
+ggplot(data = hourly_data, aes(x = as.factor(hour_of_day))) +
+  geom_bar(aes(weight = calories), stat = "count") +
+  labs(title = "'calories' observations throughout a 24 hour day") +
+  scale_y_continuous(name = "Count", labels = scales::comma) +
+  scale_x_discrete(
+    "Hour of day",
+    labels = labels_hour_of_day,
+    guide = guide_axis(angle = 45)
+    ) +
+  theme_minimal()
+# average_intensity observations per hour ---------------------------
+ggplot(data = hourly_data, aes(x = as.factor(hour_of_day))) +
+  geom_bar(aes(weight = average_intensity), stat = "count") +
+  labs(title = "'average_intensity' observations throughout a 24 hour day") +
+  scale_y_continuous(name = "Count", labels = scales::comma) +
+  scale_x_discrete(
+    "Hour of day", 
+    labels = labels_hour_of_day,
+    guide = guide_axis(angle = 45)
+    ) +
+  theme_minimal()
+```
+
+All three variables --- `step_total`, `calories`, `average_intensity` --- have 
+similar shapes. The counts are lowest from 12:00-4:00 AM (00:00-04:00), which is
+when most people are asleep. The two time windows with highest counts of 
+observations are the same across all three graphs:  
+
+* 12:00 - 2:00 PM (12:00 - 14:00)
+*  5:00 - 7:00 PM (17:00 - 19:00)  
+
+### Average intensity vs time  
+
+What's the relationship between time and average intensity? For example, are 
+people's activities more intense in the morning vs. the evening? How does this
+info compare with the observation counts from the plots above?  
+
+```{r, average-intensity-throughout-day, fig.width=10, fig.height=6, fig.asp=NULL, eval=TRUE}
+# Average intensity throughout the day ---------------------------
+average_intensity_p <- 
+  ggplot(
+    data = hourly_data, 
+    aes(x = time_list, y = average_intensity, color = average_intensity)
+         )
+average_intensity_p +
+  geom_jitter(width = 0.3, size = 0.2) +
+  labs(
+    x = "Hour", 
+    y = "Average intensity",
+    color = "Average Intensity",
+    title = "Average intensity throughout the day"
+  ) + 
+  stat_summary(
+    aes(x = time_list, y = average_intensity),
+    fun = mean, 
+    geom = "point", 
+    color = "white", 
+    size = 1,
+    alpha = 0.7
+    ) +
+  scale_color_viridis_c() +
+  theme_solarized(light = FALSE) +
+  theme(
+    axis.title.x = element_text(
+      margin = margin(5, 0, 5, 0),
+      size = 12
+    ),
+    axis.title.y = element_text(
+      margin = margin(0, 5, 0, 5),
+      size = 12
+    ),
+    plot.title = element_text(
+      margin = margin(10, 0, 10, 0),
+      size = 14
+    ),
+    axis.text.x = element_text(
+      angle = 45,
+      vjust = 1,
+      hjust = 1,
+      size = 8
+    )
+  )
+```
+As you might expect, the average intensity begins to rise around 5:00 AM and 
+stays relatively high throughout the workday before lowering around 8:00 PM. 
+This is evident by looking at the mean for each hour, which is represented by
+the white dots in each column. The peak times look to be the same as what we 
+saw earlier for observation counts:  
+
+* 12:00 - 2:00 PM (12:00 - 14:00)
+*  5:00 - 7:00 PM (17:00 - 19:00)   
+
+How about day-to-day?  
+
+```{r, average-intensity-throughout-week, fig.width=10, fig.height=6, fig.asp=NULL, eval=TRUE}
+# Average intensity throughout the week ---------------------------
+average_intensity_p <- 
+  ggplot(
+    data = hourly_data,
+    aes(
+      x = reorder(day_list, desc(day_list)),
+      y = average_intensity, 
+      color = average_intensity
+      )
+    )
+average_intensity_p +
+  geom_jitter(width = 0.3, size = 0.1) +
+  labs(
+    x = "Day", 
+    y = "Average intensity",
+    color = "Average Intensity",
+    title = "Average intensity throughout the week"
+  ) + 
+  stat_summary(
+    aes(
+      x = reorder(day_list, desc(day_list)),
+      y = average_intensity
+      ),
+    fun = mean, 
+    geom = "point", 
+    color = "white", 
+    size = 1,
+    alpha = 0.7
+    ) +
+  scale_color_viridis_c() +
+  theme_solarized(light = FALSE) +
+  theme(
+    axis.title.x = element_text(
+      margin = margin(5, 0, 5, 0),
+      size = 12
+    ),
+    axis.title.y = element_text(
+      margin = margin(0, 5, 0, 5),
+      size = 12
+    ),
+    plot.title = element_text(
+      margin = margin(10, 0, 10, 0),
+      size = 14
+    ),
+    axis.text.x = element_text(
+      size = 12
+    )
+  ) +
+  coord_flip()
+```
+
+Unlike the hour-to-hour observations, there isn't as clear a pattern day-to-day.  
+This is once again evident my looking at the mean for each day, which is 
+represented by the white dots in each column. The difference in position for 
+each dot is minuscule here.  
+
+Let's go back to intensity and hour of day. Are the trends similar when we look
+at the weekend vs. week?  
+
+```{r, hourly-intensities-vs-time-of-day, fig.height=10, fig.width=15, fig.asp=NULL, eval=TRUE}
+# average_intensity throughout a 24 hour day ---------------------------
+hd_A <- dplyr::select(hourly_data, -time_of_week)
+ggplot(
+  data = hourly_data,
+  aes(x = as.factor(hour_of_day), y = average_intensity)
+  ) +
+  geom_jitter(data = hd_A, color = "grey70", width = 0.4, alpha = 0.6, size = 2) +
+  geom_jitter(aes(color = time_of_week), width = 0.4, alpha = 0.6, size = 2) +
+  scale_color_viridis_d(begin = 0, end = .5) +
+  labs(
+    title = "Average intensity throughout a 24 hour day",
+    x = "Hour"
+    ) +
+  ylab("Average intensity") +
+  scale_x_discrete(
+    "Hour of day",
+    expand = c(0.0002, 0.0002),
+    labels = labels_hour_of_day,
+    guide = guide_axis(angle = 45)
+    ) +
+  stat_summary(
+    aes(x = as.factor(hour_of_day), y = average_intensity),
+    fun = mean, 
+    geom = "point", 
+    color = "#fde725", 
+    size = 4
+    ) +
+  theme_pander() + 
+  theme(
+    legend.position = "none",
+    axis.title.x = element_text(
+      margin = margin(15, 0, 10, 0),
+      size = 16
+    ),
+    axis.title.y = element_text(
+      margin = margin(0, 10, 0, 10),
+      size = 16
+    ),
+    plot.title = element_text(
+      margin = margin(10, 0, 10, 0),
+      size = 20
+    ),
+    strip.text.x = element_text(
+      margin = margin(10, 0, 10, 0),
+      size = 14
+    ), 
+    axis.text.x = element_text(
+      size = 12
+    ),
+    axis.text.y = element_text(
+      size = 12
+    )
+  ) +
+  facet_wrap(vars(time_of_week), nrow = 2)
+# total_intensity throughout a 24 hour day ---------------------------
+jitter_pos <- 
+  position_jitter(width = 0.25, height = 0, seed = 42)
+set.seed(42)
+hd_A <- 
+  dplyr::select(hourly_data, -time_of_week)
+set.seed(42)
+hd_total_intensity_p <- 
+  ggplot(
+    data = hourly_data,
+    aes(x = as.factor(hour_of_day), y = total_intensity, color = time_of_week)
+    )
+# total_intensity throughout a 24 hour day ---------------------------
+hd_total_intensity_p +
+  geom_point(
+    data = transform(hourly_data, time_of_week = NULL),
+    color = "grey70",
+    position = position_jitter(width = 0.4, height = 0, seed = 42),
+    size = 2
+  ) +
+  geom_point(
+    position = position_jitter(width = 0.4, height = 0, seed = 42),
+    size = 2,
+    alpha = 0.6
+  ) +
+  labs(
+    title = "Total intensity throughout a 24 hour day", 
+    x = "Hour"
+    ) +
+  ylab("Total intensity") +
+  scale_color_viridis_d(begin = 0, end = .5, guide = "legend") +
+  scale_x_discrete(
+    "Hour of day",
+    expand = c(0.0002, 0.0002),
+    labels = labels_hour_of_day,
+    guide = guide_axis(angle = 45)
+    ) +
+  stat_summary(
+    aes(x = as.factor(hour_of_day), y = total_intensity),
+    fun = mean,
+    geom = "point", 
+    color = "#fde725",
+    size = 4
+    ) +
+  theme_pander() + 
+  theme(
+    legend.position = "none",
+    axis.title.x = element_text(
+      margin = margin(15, 0, 10, 0),
+      size = 16
+    ),
+    axis.title.y = element_text(
+      margin = margin(0, 10, 0, 10),
+      size = 16
+    ),
+    plot.title = element_text(
+      margin = margin(10, 0, 10, 0),
+      size = 20
+    ),
+    strip.text.x = element_text(
+      margin = margin(10, 0, 10, 0),
+      size = 14
+    ),
+    axis.text.x = element_text(
+      size = 12
+    ),
+    axis.text.y = element_text(
+      size = 12
+    )
+  ) +
+  facet_wrap(vars(time_of_week), nrow = 2)
+```
+
+
+### Active vs sedentary    
+How about active minutes vs. sedentary minutes throughout the week?  
+
+```{r, active-minutes-vs-sedentary-minutes-throughout-week-pt-1, fig.width=10, fig.asp=NULL, eval=TRUE}
+# Create theme for plot formatting ---------------------------
+theme_margin <- 
+  theme(
+    axis.title.x = element_text(margin = margin(15, 0, 15, 0)),
+    axis.title.y = element_text(margin = margin(0, 10, 0, 10)),
+    plot.title = element_text(margin = margin(10, 0, 10, 0)),
+    strip.text.x = element_text(margin = margin(10, 0, 10, 0)),
+    )
+# Very active minutes vs sedentary minutes ---------------------------
+dd02_A <- dplyr::select(daily_data, -time_of_week)
+ggplot(daily_data, aes(x = very_active_m, y = sedentary_m)) +
+  geom_jitter(data = dd02_A, color = "grey70") +
+  geom_jitter(
+    aes(x = very_active_m, y = sedentary_m),
+    color = "#112E51", 
+    width = 0.4, 
+    size = 1
+    ) +
+  labs(title = "Very active minutes vs sedentary minutes throughout the week") +
+  ylab("Sedentary minutes") +
+  xlab("Very active minutes") +
+  geom_smooth(
+    aes(x = very_active_m, y = sedentary_m),
+    color = "#00CFFF", 
+    linetype = "longdash", 
+    alpha = 0.4,
+    se = FALSE
+    ) +
+  theme_minimal() + 
+  theme_margin +
+  facet_grid(~time_of_week ~ .)
+# Fairly active minutes vs sedentary minutes ---------------------------
+dd02_A <- dplyr::select(daily_data, -time_of_week)
+ggplot(daily_data, aes(x = fairly_active_m, y = sedentary_m)) +
+  geom_jitter(data = dd02_A, color = "grey70") +
+  geom_jitter(
+    aes(x = fairly_active_m, y = sedentary_m),
+    color = "#112E51", 
+    width = 0.4, 
+    size = 1
+    ) +
+  labs(
+    title = "Fairly active minutes vs sedentary minutes throughout the week"
+    ) +
+  ylab("Sedentary minutes") +
+  xlab("Fairly active minutes") +
+  geom_smooth(
+    aes(x = fairly_active_m, y = sedentary_m),
+    color = "#00CFFF", 
+    linetype = "longdash", 
+    alpha = 0.6,
+    se = FALSE
+    ) +
+  theme_minimal() + 
+  theme_margin +
+  facet_grid(~time_of_week ~ .)
+# Lightly active minutes vs sedentary minutes ---------------------------
+dd02_A <- dplyr::select(daily_data, -time_of_week)
+ggplot(daily_data, aes(x = lightly_active_m, y = sedentary_m)) +
+  geom_jitter(data = dd02_A, color = "grey70") +
+  geom_jitter(
+    aes(x = lightly_active_m, y = sedentary_m),
+    color = "#112E51", 
+    width = 0.4, 
+    size = 1
+    ) +
+  labs(
+    title = "Lightly active minutes vs sedentary minutes throughout the week"
+    ) +
+  ylab("Sedentary minutes") +
+  xlab("Lightly active minutes") +
+  geom_smooth(
+    aes(x = lightly_active_m, y = sedentary_m),
+    color = "#00CFFF", 
+    linetype = "longdash", 
+    alpha = 0.6,
+    se = FALSE
+    ) +
+  theme_minimal() + 
+  theme_margin +
+  facet_grid(~time_of_week ~ .)
+```
+
+
+## Active minutes   
+
+### A key health metric  
+
+Of all the metrics we've explored thus far, active minutes is the one we're 
+going to focus on moving forward. We'll use this section to generate our 
+supporting visualizations and key findings. Then, we'll provide our top 
+high-level content recommendations based on this analysis to our key 
+stakeholders.  
+
+### Trends in active minutes  
+
+Experts recommend adults get at least 150 to 300 minutes of moderate to vigorous 
+aerobic activity per week (see: [Every move counts towards better health – says WHO](https://www.who.int/news/item/25-11-2020-every-move-counts-towards-better-health-says-who)).
+From the summary analysis above, we can see that the median amount of 
+moderate/vigorous minutes per week these participants are getting is 
+**182 minutes**. How many minutes per week are participants actually meeting 
+this criteria? How can we encourage this more?  
+
+Let's look at the 154 individual weekly activity totals to gauge activity levels 
+across the participant group. We'll start with `weekly_moderate_m` totals:  
+
+
+```{r, moderate-activity-vs-week, fig.height=4, fig.width=8, fig.asp=NULL, eval=TRUE}
+# Create labels for week-month-year ---------------------------
+labels_wmy <- c(
+  "Week 15\nApr-16", "Week 16\nApr-16", "Week 17\nApr-16", "Week 18\nMay-16",
+  "Week 19\nMay-16"
+)
+# create df to use in next plot ---------------------------
+weekly_moderate_150_300 <- as.data.frame(
+  weekly_data %>%
+    group_by(
+      weekly_moderate_m < 150,
+      (weekly_moderate_m >= 150 & weekly_moderate_m < 300),
+      weekly_moderate_m >= 300
+    ) %>%
+    tally()
+)
+weekly_moderate_150_300_table <- 
+  cbind(c("300+ ", "150 - 300 ", "0 - 150 "), weekly_moderate_150_300[, 4])
+# Create weekly_moderate_p ---------------------------
+weekly_moderate_p <- 
+  ggplot(weekly_data, aes(x = week_number, y = weekly_moderate_m))
+# Add layers to weekly_moderate_p ---------------------------
+weekly_moderate_p +
+  geom_point(
+    data = weekly_data[which(weekly_data$weekly_moderate_m >= 300), ],
+    aes(color = "300+ "), 
+    size = 2, 
+    position = position_jitter(width = .25, height = 0), 
+    alpha = 0.5
+  ) +
+  geom_point(
+    data = weekly_data[which(weekly_data$weekly_moderate_m >= 150 & weekly_data$weekly_moderate_m < 300), ],
+    aes(color = "150 - 300 "), 
+    size = 2, 
+    position = position_jitter(width = .25, height = 0), 
+    alpha = 0.5
+  ) +
+  geom_point(
+    data = weekly_data[which(weekly_data$weekly_moderate_m < 150), ],
+    aes(color = "0 - 150 "), 
+    size = 2, 
+    position = position_jitter(width = .25, height = 0), 
+    alpha = 0.5
+  ) +
+  scale_x_discrete(name = NULL, labels = labels_wmy) +
+  scale_y_continuous(
+    breaks = c(0, 150, 300, 450, 600, 750, 900, 1050), 
+    limits = c(0, 1060)) +
+  scale_color_manual(
+    name = "Minutes",
+    labels = c("300+ ", "150 - 300 ", "0 - 150 "),
+    values = c(
+      "300+ " = "#225ea8",
+      "150 - 300 " = "#41b6c4",
+      "0 - 150 " = "#707070"
+    )
+  ) +
+  labs(
+    title = "Moderate activity",
+    subtitle = "(minutes per week)"
+  ) +
+  geom_hline(yintercept = 150, linetype = "dashed") +
+  geom_hline(yintercept = 300, linetype = "dashed") +
+  ylab("Activity minutes") +
+  theme_classic() +
+  theme(
+    plot.subtitle = element_text(
+      margin = margin(1, 5, 5, 0),
+      size = 10,
+      hjust = 1,
+      face = "italic"
+    ),
+    axis.title.y = element_text(
+      margin = margin(0, 5, 0, 5),
+      size = 12
+    ),
+    plot.title = element_text(
+      margin = margin(5, 5, 5, 0),
+      size = 14,
+      hjust = 1,
+      face = "bold"
+    ),
+    legend.position = "bottom"
+  ) +
+  guides(color = guide_legend(override.aes = list(size = 3))) +
+  # Add summary table to weekly_moderate_p ---------------------------
+  coord_cartesian(clip = "off") +
+  theme(
+    plot.margin = margin(1, 25, 1, 1)
+  ) +
+  annotation_custom(
+    grob = tableGrob(weekly_moderate_150_300_table, theme = ttheme_minimal(
+      base_size = 9,
+      base_color = "black",
+      base_family = "",
+      parse = FALSE,
+      padding = unit(c(4, 4), "mm"),
+      core = list(
+        bg_params = list(fill = c("#225ea8", "#41b6c4", "#707070"), 
+                         alpha = .3, 
+                         col = NA),
+        fg_params = list(hjust = 0, x = 0.15, fontface = c(rep("plain", 3))),
+        colhead = list(fg_params = list(hjust = 0, x = 0.15))
+      ),
+      vp = NULL
+    )),
+    xmin = 4.5, xmax = 6, ymin = 600, ymax = 1050
+  )
+```
+
+Now let's look at `weekly_vigorous_m` totals:  
+
+```{r, vigorous-activity-vs-week, fig.align="center", fig.height=4, fig.width=8, fig.asp=NULL, eval=TRUE}
+# Create df to use in next plot  ---------------------------
+weekly_vigorous_75_150 <- 
+  as.data.frame(
+    weekly_data %>%
+      group_by(
+        weekly_vigorous_m < 75,
+        (weekly_vigorous_m >= 75 & weekly_vigorous_m < 150),
+        weekly_vigorous_m >= 150
+        ) %>%
+      tally()
+    )
+weekly_vigorous_75_150_table <- 
+  cbind(c("150+ ", "75 - 150 ", "0 - 75 "), weekly_vigorous_75_150[, 4])
+# Create weekly_vigorous_p ---------------------------
+weekly_vigorous_p <- 
+  ggplot(weekly_data, aes(x = week_number, y = weekly_vigorous_m))
+# Add layers to weekly_vigorous_p ---------------------------
+weekly_vigorous_p +
+  geom_point(
+    data = weekly_data[which(weekly_data$weekly_vigorous_m >= 150), ],
+    aes(color = "150+ "), 
+    size = 2, 
+    position = position_jitter(width = .25, height = 0), 
+    alpha = 0.4
+  ) +
+  geom_point(
+    data = weekly_data[which(weekly_data$weekly_vigorous_m >= 75 & weekly_data$weekly_vigorous_m < 150), ],
+    aes(color = "75 - 150 "), 
+    size = 2, 
+    position = position_jitter(width = .25, height = 0), 
+    alpha = 0.4
+  ) +
+  geom_point(
+    data = weekly_data[which(weekly_data$weekly_vigorous_m < 75), ],
+    aes(color = "0 - 75 "), 
+    size = 2, 
+    position = position_jitter(width = .25, height = 0), 
+    alpha = 0.4
+  ) +
+  scale_x_discrete(name = NULL, labels = labels_wmy) +
+  scale_y_continuous(breaks = c(0, 75, 150, 300, 450, 600, 750, 900, 1050), 
+                     limits = c(0, 1060)) +
+  scale_color_manual(
+    name = "Minutes",
+    labels = c("150+ ", "75 - 150 ", "0 - 75 "),
+    values = c(
+      "150+ " = "#225ea8",
+      "75 - 150 " = "#41b6c4",
+      "0 - 75 " = "#707070"
+    )
+  ) +
+  labs(
+    title = "Vigorous activity",
+    subtitle = "(minutes per week)"
+  ) +
+  geom_hline(yintercept = 75, linetype = "dashed") +
+  geom_hline(yintercept = 150, linetype = "dashed") +
+  ylab("Activity minutes") +
+  theme_classic() +
+  theme(
+    plot.subtitle = element_text(
+      margin = margin(1, 5, 5, 0),
+      size = 10,
+      hjust = 1,
+      face = "italic"
+    ),
+    axis.title.y = element_text(
+      margin = margin(0, 5, 0, 5),
+      size = 12
+    ),
+    plot.title = element_text(
+      margin = margin(5, 5, 5, 0),
+      size = 14,
+      hjust = 1,
+      face = "bold"
+    ),
+    legend.position = "bottom"
+  ) +
+  guides(color = guide_legend(override.aes = list(size = 3))) +
+  # Add summary table to weekly_vigorous_p ---------------------------
+  coord_cartesian(clip = "off") +
+  theme(
+    plot.margin = margin(1, 25, 1, 1)
+  ) +
+  annotation_custom(
+    grob = tableGrob(
+      weekly_vigorous_75_150_table, 
+      theme = ttheme_minimal(
+        base_size = 9,
+        base_color = "black",
+        base_family = "",
+        parse = FALSE,
+        padding = unit(c(4, 4), "mm"),
+        core = list(
+          bg_params = list(
+            fill = c("#225ea8", "#41b6c4", "#707070"), 
+            alpha = .3, 
+            col = NA),
+        fg_params = list(hjust = 0, x = 0.15, fontface = c(rep("plain", 3))),
+        colhead = list(fg_params = list(hjust = 0, x = 0.15))
+        ),
+        vp = NULL
+        )
+      ),
+    xmin = 4.5, 
+    xmax = 6, 
+    ymin = 600, 
+    ymax = 1050
+    )
+```
+
+While the above graphs for moderate minutes and vigorous minutes are 
+interesting, it would be more beneficial to combine these metrics together when 
+considering the 150 to 300 minute goal for moderate to vigorous physical 
+activity per week:  
+
+
+```{r, combined-moderate-vigorous-activity-vs-week, fig.align="center", fig.height=4, fig.width=8, fig.asp=NULL, eval=TRUE}
+# Create df to use in next plot ---------------------------
+weekly_moderate_vigorous_150_300 <- 
+  as.data.frame(
+    weekly_data %>%
+      group_by(
+        weekly_mod_vig_m < 150, 
+        (weekly_mod_vig_m >= 150 & weekly_mod_vig_m < 300), 
+        weekly_mod_vig_m >= 300
+    ) %>%
+    tally()
+)
+weekly_moderate_vigorous_150_300_table <- 
+  cbind(c("300+ ", "150 - 300 ", "0 - 150 "), weekly_moderate_vigorous_150_300[, 4])
+# Create weekly_moderate_vigorous_p ---------------------------
+weekly_moderate_vigorous_p <- 
+  ggplot(weekly_data, aes(x = week_number, y = weekly_mod_vig_m))
+# Add layers to weekly_moderate_vigorous_p ---------------------------
+weekly_moderate_vigorous_p +
+  geom_point(
+    data = weekly_data[which(weekly_data$weekly_mod_vig_m >= 300), ],
+    aes(color = "300+ "), 
+    size = 2, 
+    position = position_jitter(width = .25, height = 0), 
+    alpha = 0.5
+  ) +
+  geom_point(
+    data = weekly_data[which(weekly_data$weekly_mod_vig_m >= 150 & weekly_data$weekly_mod_vig_m < 300), ],
+    aes(color = "150 - 300 "), 
+    size = 2, 
+    position = position_jitter(width = .25, height = 0), 
+    alpha = 0.5
+  ) +
+  geom_point(
+    data = weekly_data[which(weekly_data$weekly_mod_vig_m < 150), ],
+    aes(color = "0 - 150 "), 
+    size = 2, 
+    position = position_jitter(width = .25, height = 0), 
+    alpha = 0.5
+  ) +
+  scale_x_discrete(name = NULL, labels = labels_wmy) +
+  scale_y_continuous(breaks = c(0, 150, 300, 450, 600, 750, 900, 1050), limits = c(0, 1060)) +
+  scale_color_manual(
+    name = "Minutes",
+    labels = c("300+ ", "150 - 300 ", "0 - 150 "),
+    values = c(
+      "300+ " = "#225ea8",
+      "150 - 300 " = "#41b6c4",
+      "0 - 150 " = "#707070"
+    )
+  ) +
+  labs(
+    title = "Combined moderate/vigorous activity",
+    subtitle = "(minutes per week)"
+  ) +
+  geom_hline(yintercept = 150, linetype = "dashed") +
+  geom_hline(yintercept = 300, linetype = "dashed") +
+  ylab("Activity minutes") +
+  theme_classic() +
+  theme(
+    plot.subtitle = element_text(
+      margin = margin(1, 5, 5, 0),
+      size = 10,
+      hjust = 1,
+      face = "italic"
+    ),
+    axis.title.y = element_text(
+      margin = margin(0, 5, 0, 5),
+      size = 12
+    ),
+    plot.title = element_text(
+      margin = margin(5, 5, 5, 0),
+      size = 14,
+      hjust = 1,
+      face = "bold"
+    ),
+    legend.position = "bottom"
+  ) +
+  guides(color = guide_legend(override.aes = list(size = 3))) +
+  # Add summary table to weekly_moderate_vigorous_p ---------------------------
+  coord_cartesian(clip = "off") +
+  theme(
+    plot.margin = margin(1, 25, 1, 1)
+  ) +
+  annotation_custom(
+    grob = tableGrob(
+      weekly_moderate_vigorous_150_300_table, 
+      theme = ttheme_minimal(
+        base_size = 9,
+        base_color = "black",
+        base_family = "",
+        parse = FALSE,
+        padding = unit(c(4, 4), "mm"),
+        core = list(
+          bg_params = list(
+            fill = c("#225ea8", "#41b6c4", "#707070"), 
+            alpha = .3, 
+            col = NA),
+          fg_params = list(hjust = 0, 
+                           x = 0.15, 
+                           fontface = c(rep("plain", 3))),
+          colhead = list(fg_params = list(hjust = 0, x = 0.15))
+          ),
+        vp = NULL
+        )
+      ),
+    xmin = 4.5, 
+    xmax = 6, 
+    ymin = 600, 
+    ymax = 1050
+  )
+ggsave(filename = "Moderate_vigorous_activity_per_week_color.png", path = "images")
+# Create basic graph showing 154 totals in grey ---------------------------
+weekly_moderate_vigorous_p <- 
+  ggplot(weekly_data, aes(x = week_number, y = weekly_mod_vig_m))
+# Add layers ---------------------------
+weekly_moderate_vigorous_p +
+  geom_point(
+    data = weekly_data[which(weekly_data$weekly_mod_vig_m >= 300), ],
+    aes(color = "300+ "), 
+    size = 2, 
+    position = position_jitter(width = .25, height = 0), 
+    alpha = 0.5
+    ) +
+  geom_point(
+    data = weekly_data[which(weekly_data$weekly_mod_vig_m >= 150 & weekly_data$weekly_mod_vig_m < 300), ],
+    aes(color = "150 - 300 "), 
+    size = 2, 
+    position = position_jitter(width = .25, height = 0), 
+    alpha = 0.5
+  ) +
+  geom_point(
+    data = weekly_data[which(weekly_data$weekly_mod_vig_m < 150), ],
+    aes(color = "0 - 150 "), 
+    size = 2, 
+    position = position_jitter(width = .25, height = 0), 
+    alpha = 0.5
+  ) +
+  scale_x_discrete(name = NULL, labels = labels_wmy) +
+  scale_y_continuous(breaks = c(0, 150, 300, 450, 600, 750, 900, 1050), 
+                     limits = c(0, 1060)) +
+  scale_color_manual(
+    name = "Minutes",
+    labels = c("300+ ", "150 - 300 ", "0 - 150 "),
+    values = c(
+      "300+ " = "#707070",
+      "150 - 300 " = "#707070",
+      "0 - 150 " = "#707070"
+    )
+  ) +
+  labs(
+    title = "Combined moderate/vigorous activity",
+    subtitle = "(minutes per week)"
+  ) +
+  ylab("Activity minutes") +
+  theme_classic() +
+  theme(
+    plot.subtitle = element_text(
+      margin = margin(1, 5, 5, 0),
+      size = 10,
+      hjust = 1,
+      face = "italic"
+    ),
+    axis.title.y = element_text(
+      margin = margin(0, 5, 0, 5),
+      size = 12
+    ),
+    plot.title = element_text(
+      margin = margin(5, 5, 5, 0),
+      size = 14,
+      hjust = 1,
+      face = "bold"
+    ),
+    legend.position = "none"
+  ) +
+  guides(color = guide_legend(override.aes = list(size = 3)))
+ggsave(filename = "Moderate_vigorous_activity_per_week_gs.png", path = "images")
+```
+
+There are some interesting discoveries here:
+
+* **45%** of the weekly moderate/vigorous intensity active minute totals are 
+less than 150 minutes  
+    + 0-150   =	45%	(70/154)  
+    
+* **29%** of the weekly moderate/vigorous intensity active minute totals are 
+between 150 and 300
+    + 150-300 =	29%	(44/154)  
+    
+* **26%** of the weekly moderate/vigorous intensity active minute totals are 
+above 300  
+    + 300+    = 26%	(40/154)  
+    
+So, the largest percentage (45%) of these 154 weekly activity totals are less 
+than 150 minutes. This trend in the physical activity of smart device users is 
+fascinating. However, plotting the 154 weekly totals like this can only take us 
+so far in learning about these users at an individual level. For further 
+understanding, we need to delve deeper…
+
+```{r, time-series-view-of-weekly-moderate-vigorous-totals, fig.width=10, fig.height=5, eval=TRUE}
+# Create labels and limits for week numbers ---------------------------
+labels_week_n <- c("W\n1", "W\n2", "W\n3", "W\n4", "W\n5")
+limits_week_n <- c(
+  "Week 15, Apr 2016", "Week 16, Apr 2016", "Week 17, Apr 2016",
+  "Week 18, May 2016", "Week 19, May 2016"
+)
+# Weekly_moderate_vigorous plot ---------------------------
+# for all 33 participants
+weekly_moderate_vigorous_p <- 
+  weekly_data %>%
+  {
+    ggplot(.) +
+      geom_line(
+        aes(
+          x = as.factor(week_number), 
+          y = weekly_mod_vig_m,
+          group = id, 
+          color = as.factor(id)
+          ),
+        linejoin = "mitre",
+        lineend = "butt",
+        show.legend = FALSE,
+        size = .5
+        ) +
+      geom_point(
+        aes(
+          x = as.factor(week_number), 
+          y = weekly_mod_vig_m, 
+          group = id, 
+          color = as.factor(id)
+          ), 
+        show.legend = FALSE, 
+        size = 1) +
+      labs(
+        title = "Moderate/vigourous activity",
+        subtitle = "Weekly totals for 33 participants",
+        y = "Minutes"
+      ) +
+      scale_x_discrete(
+        name = NULL,
+        limits = limits_week_n,
+        labels = labels_week_n,
+        expand = c(0, 0)
+      ) +
+      scale_y_continuous(
+        breaks = c(0, 150, 300, 450, 600, 750, 900), 
+        limits = c(0, 1060)
+        ) +
+      scale_color_discrete() +
+      geom_hline(yintercept = 150, linetype = "dashed") +
+      geom_hline(yintercept = 300, linetype = "dashed") +
+      theme_minimal() +
+      facet_wrap(~id, drop = TRUE, nrow = 3, ncol = 11, scales = "fixed") +
+      theme(
+        plot.title = element_text(
+          margin = margin(5, 5, 5, 0),
+          size = 14,
+          hjust = 1,
+          face = "bold"
+        ),
+        plot.subtitle = element_text(
+          margin = margin(1, 5, 5, 0),
+          size = 10,
+          hjust = 1,
+          face = "italic"
+        ),
+        axis.title.y = element_text(
+          margin = margin(0, 5, 0, 5),
+          size = 12
+        ),
+        panel.spacing.x = unit(.75, "lines")
+      )
+  }
+ggsave(file = "weekly_activity_33.png", path = "images")
+weekly_moderate_vigorous_p
+```
+
+The main takeaway for the above plot is to show we have 33 graphs for the 33 
+users. With this data, we can learn more about each user’s active minute totals 
+week-to-week, which brings us to what I really want to discuss: Achievement Rate  
+
+>**Achievement Rate** = percentage of weeks a participant is successful in achieving 
+≥ 150 moderate/vigorous activity minutes
+
+How do these smart device users group across the below three achievement rates?  
+
+* Group A: high rate 	➜ 	successful 80-100% of weeks
+* Group B: regular rate	➜ 	successful 60-79% of weeks
+* Group C: low rate		➜ 	successful 0-59% of weeks
+
+<br>
+
+<center>
+![Achievement Rate Groups](images/achievement_rate_groups.png)
+</center>
+
+<br>
+
+**Group A: high weekly achievement rate**  
+
+* 45.5% of all participants are in this group (*15 of 33*)  
+* 73% of Group A earned  ≥ 150 every week! (*11 of 15*); 33% of all (*11/33*)  
+
+**Group B: regular achievement rate**  
+
+* 6% of all participants are in this group (*2 of 33*)  
+
+**Group C: low weekly achievement rate**  
+
+* 48.5% of all participants are in this group (*16 of 33*)  
+* 63% of Group C earned ≥ 150 minutes per week zero times! (*10 of 16*); 30% of all (*10/33*)
+
+
+Let's use `personograph` to create icon charts that visualize these groups. We'll
+apply their respective percentages to 100:  
+
+```{r, create-icon-charts-for-subgroups, fig.asp=NULL, eval=TRUE}
+# weekly_achievement_groups plots ---------------------------
+weekly_achievement_groups <- 
+  c("Group A" = .455, "Group B" = .06, "Group C" = .485)
+personograph(
+  data = weekly_achievement_groups,
+  fig.title = NULL, 
+  fig.cap = NULL, 
+  draw.legend = F, 
+  icon = NULL,
+  icon.dim = NULL, 
+  icon.style = 6, 
+  n.icons = 100, 
+  plot.width = 0.75,
+  dimensions = ceiling(sqrt(c(100, 100))), 
+  fudge = 0.0075,
+  legend.show.zeros = TRUE, 
+  force.fill = "ignore",
+  colors = c("Group A" = "#052049", "Group B" = "#007cbe","Group C" = "#058488")
+  )
+png(file = "achievement_groups.png")
+dev.off()
+# Group a ---------------------------
+weekly_achievement_group_a <- c("Group B and C" = .545, "Group A" = .455)
+personograph(
+  data = weekly_achievement_group_a,
+  fig.title = "Group A: high weekly achievement rate (80-100%)",
+  fig.cap = NULL, 
+  draw.legend = F, 
+  icon = NULL,
+  icon.dim = NULL, 
+  icon.style = 6, 
+  n.icons = 100, 
+  plot.width = 0.75,
+  dimensions = ceiling(sqrt(c(100, 100))), 
+  fudge = 0.0075,
+  legend.show.zeros = TRUE, 
+  force.fill = "ignore",
+  colors = c("Group B and C" = "grey", "Group A" = "#052049")
+  )
+# Group b ---------------------------
+weekly_achievement_group_b <- c("Group A and C" = .94, "Group B" = .06)
+personograph(
+  data = weekly_achievement_group_b,
+  fig.title = "Group B: regular weekly achievement rate (60-79%)",
+  fig.cap = NULL, 
+  draw.legend = F, 
+  icon = NULL,
+  icon.dim = NULL, 
+  icon.style = 6, 
+  n.icons = 100, 
+  plot.width = 0.75,
+  dimensions = ceiling(sqrt(c(100, 100))), 
+  fudge = 0.0075,
+  legend.show.zeros = TRUE, 
+  force.fill = "ignore",
+  colors = c("Group A and C" = "grey", "Group B" = "#007cbe")
+  )
+# Group c ---------------------------
+weekly_achievement_group_c <- c("Group A and B" = .515, "Group C" = .485)
+personograph(
+  data = weekly_achievement_group_c,
+  fig.title = "Group C: low weekly achievement rate (0-59%)",
+  fig.cap = NULL, 
+  draw.legend = F, 
+  icon = NULL,
+  icon.dim = NULL, 
+  icon.style = 6, 
+  n.icons = 100, 
+  plot.width = 0.75,
+  dimensions = ceiling(sqrt(c(100, 100))), 
+  fudge = 0.0075,
+  legend.show.zeros = TRUE, 
+  force.fill = "ignore",
+  colors = c("Group A and B" = "grey", "Group C" = "#058488")
+  )
+```
+
+
+# Share  
+
+***
+
+## Stakeholder presentation  
+
+I've provided a link below for my presentation, which includes the following:  
+
+* A summary of my analysis  
+* Supporting visualizations and key findings  
+* Recommendations for marketing strategy within the Bellabeat App  
+
+
+[HTML](https://docs.google.com/presentation/d/1iUSOOkS2ltHPzK16cE9teWgOwfBGd1UAC1KaZ_ucew4/present?slide=id.p) (Google Slides; requires online access)
+
+
+
+## Session info  
+
+```{r, session-info, include=TRUE, eval=TRUE, message=FALSE}
+sessionInfo()
+```
+
+
+## References  
+
