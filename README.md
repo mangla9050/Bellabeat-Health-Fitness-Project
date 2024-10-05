@@ -27,5 +27,4 @@ The dataset does not provide information about gender of the users. Bellabeat is
 The data is from 2023.
 I have used R programming language on RStudio for this project to help process and analyze. In order to solve this business task, only 6 of the given 10 datasets were used.
 
-## Process ##
-Clean and format data to be more meaningful and clearer. In this step I have organized data by adding columns, extracting information and removing bad data and duplicates.
+
