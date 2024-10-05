@@ -24,5 +24,8 @@ To answer Bellabeat's business tasks I will be using FitBit Fitness Tracker Data
 ## Considerations ##
 Sampling bias might apply, it is unclear how participants are choosen. As participants willing to make their activity data public they might be heavier users of FitBit.
 The dataset does not provide information about gender of the users. Bellabeat is a tech-driven wellness company for women only.
-The data is from 2, so it is outdated as fitness trackers matured a lot since then.
-I have used Microsoft SQL Server Management Studio for this project to help process and analyze and for visualization I have used Tableau Public. In order to solve this business task, only 6 of the given 18 datasets were used.
+The data is from 2023.
+I have used R programming language on RStudio for this project to help process and analyze. In order to solve this business task, only 6 of the given 10 datasets were used.
+
+## Process ##
+Clean and format data to be more meaningful and clearer. In this step I have organized data by adding columns, extracting information and removing bad data and duplicates.
